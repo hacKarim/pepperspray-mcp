@@ -1,0 +1,10 @@
+.env
+.env*.local
+*.log
+results/*
+!results/.gitkeep
+__pycache__/
+*.pyc
+.venv/
+.DS_Store
+.vscode/
