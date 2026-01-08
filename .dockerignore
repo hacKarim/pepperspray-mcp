@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+pepperspray_env/
+
+# Docker
+.dockerignore
+docker-compose.yml
+docker-compose.*.yml
+
+# Git
+.git/
+.gitignore
+.github/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Data directories (mounted as volumes)
+data/
+results/
+cache/
+logs/
+
+# Documentation
+README.md
+README_DOCKER.md
+*.md
+docs/
+
+# Temporary files
+*.tmp
+*.log
+.env
+.env.local
+*.pyc

@@ -1,0 +1,29 @@
+# PepperSpray Docker Requirements
+# Includes all tools: binary analysis, cloud security, and exploitation frameworks
+
+# Core Framework
+flask>=2.3.0,<4.0.0
+requests>=2.31.0,<3.0.0
+psutil>=5.9.0,<6.0.0
+mcp>=1.0.0,<2.0.0
+fastmcp>=0.2.0,<1.0.0
+
+# Web Scraping & Automation
+beautifulsoup4>=4.12.0,<5.0.0
+selenium>=4.15.0,<5.0.0
+webdriver-manager>=4.0.0,<5.0.0
+
+# Async & Networking
+aiohttp>=3.8.0,<4.0.0
+
+# Proxy & Testing
+mitmproxy>=9.0.0,<11.0.0
+
+# Security Analysis Tools
+angr>=9.0.0,<10.0.0
+pwntools>=4.12.0,<5.0.0
+
+# Memory Forensics & Analysis
+volatility3>=2.4.0,<3.0.0
+ropgadget>=7.0.0,<8.0.0
+one-gadget>=1.0.0,<2.0.0
