@@ -47,12 +47,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN go install github.com/lc/gau/v2/cmd/gau@latest && \
     go install github.com/tomnomnom/waybackurls@latest && \
     go install github.com/projectdiscovery/katana/cmd/katana@latest && \
-    go install github.com/hahwul/dalfox/v2@latest || true
+    go install github.com/hahwul/dalfox/v2@latest || echo "warning: optional tool install failed, continuing"
 
 # Install docker-bench-security
 RUN git clone --depth 1 https://github.com/docker/docker-bench-security.git /opt/docker-bench-security && \
     chmod +x /opt/docker-bench-security/docker-bench-security.sh && \
-    ln -sf /opt/docker-bench-security/docker-bench-security.sh /usr/local/bin/docker-bench-security || true
+    ln -sf /opt/docker-bench-security/docker-bench-security.sh /usr/local/bin/docker-bench-security || echo "warning: optional tool install failed, continuing"
 
 # Install Ghidra (download latest release)
 RUN mkdir -p /opt/ghidra && \
@@ -63,7 +63,7 @@ RUN mkdir -p /opt/ghidra && \
         unzip -q ghidra.zip -d /opt/ghidra && \
         rm ghidra.zip && \
         ln -sf /opt/ghidra/*/ghidraRun /usr/local/bin/ghidra; \
-    fi || true
+    fi || echo "warning: optional tool install failed, continuing"
 
 # Install Clair (latest release as binary)
 RUN cd /tmp && \
@@ -72,7 +72,7 @@ RUN cd /tmp && \
         wget -q "$CLAIR_URL" -O clair && \
         chmod +x clair && \
         mv clair /usr/local/bin/; \
-    fi || true
+    fi || echo "warning: optional tool install failed, continuing"
 
 # Install Falco (runtime security monitoring) - skip due to large binary
 # Falco can be installed separately if needed
@@ -81,7 +81,7 @@ RUN cd /tmp && \
 RUN curl -s https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/get-kube-binaries.sh 2>/dev/null | bash 2>/dev/null || \
     curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && \
     chmod +x kubectl && \
-    mv kubectl /usr/local/bin/ || true
+    mv kubectl /usr/local/bin/ || echo "warning: optional tool install failed, continuing"
 
 # Python-based tools via pip
 RUN python3 -m pip install --no-cache-dir --break-system-packages \
@@ -89,7 +89,7 @@ RUN python3 -m pip install --no-cache-dir --break-system-packages \
     one-gadget \
     volatility3 \
     angr \
-    pwntools || true
+    pwntools || echo "warning: optional tool install failed, continuing"
 
 # Create app directory
 WORKDIR /app
