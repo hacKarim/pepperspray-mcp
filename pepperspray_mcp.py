@@ -4653,7 +4653,7 @@ def setup_mcp_server(pepperspray_client: PepperSprayClient) -> FastMCP:
 
         try:
             context_dict = json.loads(context) if context != "{}" else {}
-        except:
+        except Exception:
             context_dict = {}
 
         data = {

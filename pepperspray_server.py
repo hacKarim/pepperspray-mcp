@@ -874,7 +874,7 @@ class IntelligentDecisionEngine:
             if hostname:
                 ip = socket.gethostbyname(hostname)
                 return [ip]
-        except:
+        except Exception:
             pass
         return []
 
@@ -2155,7 +2155,7 @@ class IntelligentErrorHandler:
                 "load_average": os.getloadavg() if hasattr(os, 'getloadavg') else None,
                 "active_processes": len(psutil.pids())
             }
-        except:
+        except Exception:
             return {"error": "Unable to get system resources"}
 
     def _add_to_history(self, error_context: ErrorContext):
@@ -2321,7 +2321,7 @@ class GracefulDegradation:
                 if result == 0:
                     open_ports.append(port)
                 sock.close()
-            except:
+            except Exception:
                 continue
 
         return open_ports
@@ -2340,7 +2340,7 @@ class GracefulDegradation:
                 response = requests.head(url, timeout=5, allow_redirects=True)
                 if response.status_code in [200, 301, 302, 403]:
                     found_dirs.append(directory)
-            except:
+            except Exception:
                 continue
 
         return found_dirs
@@ -5044,7 +5044,7 @@ class ProcessPool:
                         self.performance_metrics["cpu_usage"] = cpu_percent
                         self.performance_metrics["memory_usage"] = memory_info.percent
 
-                except:
+                except Exception:
                     pass  # Ignore psutil errors
 
             except Exception as e:
@@ -8457,7 +8457,7 @@ class BufferOverflowExploit:
             try:
                 response = sock.recv(1024)
                 print(f"[+] Response: {{response}}")
-            except:
+            except Exception:
                 pass
                 
             sock.close()
@@ -9114,7 +9114,7 @@ def health_check():
         try:
             result = execute_command(f"which {tool}", use_cache=True)
             tools_status[tool] = result["success"]
-        except:
+        except Exception:
             tools_status[tool] = False
 
     all_essential_tools_available = all(tools_status[tool] for tool in essential_tools)
@@ -10709,7 +10709,7 @@ def pacu():
         # Cleanup
         try:
             os.remove(command_file)
-        except:
+        except Exception:
             pass
 
         logger.info(f"📊 Pacu exploitation completed")
@@ -12010,7 +12010,7 @@ def gdb():
         if commands and os.path.exists("/tmp/gdb_commands.txt"):
             try:
                 os.remove("/tmp/gdb_commands.txt")
-            except:
+            except Exception:
                 pass
 
         logger.info(f"📊 GDB analysis completed for {binary}")
@@ -12053,7 +12053,7 @@ def radare2():
         if commands and os.path.exists("/tmp/r2_commands.txt"):
             try:
                 os.remove("/tmp/r2_commands.txt")
-            except:
+            except Exception:
                 pass
 
         logger.info(f"📊 Radare2 analysis completed for {binary}")
@@ -12372,7 +12372,7 @@ p.interactive()
         # Cleanup
         try:
             os.remove(script_file)
-        except:
+        except Exception:
             pass
 
         logger.info(f"📊 Pwntools exploit completed")
@@ -12501,7 +12501,7 @@ quit
         if commands and os.path.exists("/tmp/gdb_peda_commands.txt"):
             try:
                 os.remove("/tmp/gdb_peda_commands.txt")
-            except:
+            except Exception:
                 pass
 
         logger.info(f"📊 GDB-PEDA analysis completed")
@@ -12592,7 +12592,7 @@ for func_addr, func in cfg.functions.items():
         # Cleanup
         try:
             os.remove(script_file)
-        except:
+        except Exception:
             pass
 
         logger.info(f"📊 angr analysis completed")
@@ -13398,7 +13398,7 @@ class HTTPTestingFramework:
                 return True
             if self.scope.get('include_subdomains') and h.endswith('.'+target):
                 return True
-        except:
+        except Exception:
             return True
         return False
 
@@ -13431,7 +13431,7 @@ class HTTPTestingFramework:
                         out_data = {re.sub(pattern, repl, k): re.sub(pattern, repl, str(v)) for k, v in out_data.items()}
                     elif isinstance(out_data, str):
                         out_data = re.sub(pattern, repl, out_data)
-            except:
+            except Exception:
                 continue
         # Ensure scope restriction
         if not self._in_scope(url):
@@ -13761,7 +13761,7 @@ class BrowserAgent:
                 if lvl in ('SEVERE', 'WARNING'):
                     out.append({'level': lvl, 'message': entry.get('message', '')[:500]})
             return out
-        except:
+        except Exception:
             return []
 
     def _analyze_cookies(self, cookies: list) -> list:
@@ -13794,7 +13794,7 @@ class BrowserAgent:
             csp = headers.get('content-security-policy','')
             if csp and "unsafe-inline" in csp:
                 issues.append({'type':'weak_csp','severity':'low','description':'CSP allows unsafe-inline scripts'})
-        except:
+        except Exception:
             pass
         return issues
 
@@ -13807,7 +13807,7 @@ class BrowserAgent:
                     u = req.get('url','')
                     if u.startswith('http://'):
                         issues.append({'type':'mixed_content','severity':'medium','description':f'HTTP resource loaded over HTTPS page: {u[:100]}'})
-        except:
+        except Exception:
             pass
         return issues
 
@@ -13852,7 +13852,7 @@ class BrowserAgent:
                 try:
                     from urllib.parse import urljoin
                     action = urljoin(base, action)
-                except:
+                except Exception:
                     pass
             test_url = action + ('&' if '?' in action else '?') + '&'.join(params)
             try:
@@ -13860,7 +13860,7 @@ class BrowserAgent:
                 tested += 1
                 if payload in r.text:
                     findings.append({'type':'reflected_xss','severity':'high','description':'Payload reflected in response','url':test_url})
-            except:
+            except Exception:
                 continue
             if tested >= 5:
                 break
@@ -13877,7 +13877,7 @@ class BrowserAgent:
                 }
                 return storage;
             """)
-        except:
+        except Exception:
             return {}
 
     def _get_session_storage(self) -> dict:
@@ -13891,7 +13891,7 @@ class BrowserAgent:
                 }
                 return storage;
             """)
-        except:
+        except Exception:
             return {}
 
     def _extract_forms(self) -> list:
@@ -13915,7 +13915,7 @@ class BrowserAgent:
                     })
 
                 forms.append(form_data)
-        except:
+        except Exception:
             pass
 
         return forms
@@ -13932,7 +13932,7 @@ class BrowserAgent:
                         'href': href,
                         'text': link.text[:100]  # Limit text length
                     })
-        except:
+        except Exception:
             pass
 
         return links
@@ -13949,7 +13949,7 @@ class BrowserAgent:
                     'id': input_elem.get_attribute('id') or '',
                     'placeholder': input_elem.get_attribute('placeholder') or ''
                 })
-        except:
+        except Exception:
             pass
 
         return inputs
@@ -13970,7 +13970,7 @@ class BrowserAgent:
                             'type': 'inline',
                             'content': content[:1000]  # Limit content
                         })
-        except:
+        except Exception:
             pass
 
         return scripts
@@ -13993,7 +13993,7 @@ class BrowserAgent:
                     })
 
             return network_requests
-        except:
+        except Exception:
             return []
 
     def _analyze_page_security(self, page_source: str, page_info: dict) -> dict:
@@ -15681,7 +15681,7 @@ def discover_attack_chains():
 
                             if exploit_result.get("success"):
                                 enhanced_stage["exploit_code"] = exploit_result.get("exploit_code", "")[:500] + "..."
-                        except:
+                        except Exception:
                             enhanced_stage["exploit_available"] = False
 
                     enhanced_stages.append(enhanced_stage)
@@ -16268,7 +16268,7 @@ def suggest_ctf_tools():
         for tool in suggested_tools:
             try:
                 tool_commands[tool] = ctf_tools.get_tool_command(tool, "TARGET")
-            except:
+            except Exception:
                 tool_commands[tool] = f"{tool} TARGET"
 
         logger.info(f"🔧 CTF tools suggested | Category: {category} | Tools: {len(suggested_tools)}")
