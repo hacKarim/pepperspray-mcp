@@ -37,6 +37,6 @@ if ! command -v socat &> /dev/null; then
 fi
 
 # Connect to MCP bridge via socat
-# socat - TCP:localhost:5000
+# socat - TCP:localhost:5001
 # This creates a bidirectional bridge between stdin/stdout and the TCP socket
 exec socat - TCP:${DOCKER_HOST}:${MCP_PORT}
