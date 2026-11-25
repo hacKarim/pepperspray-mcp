@@ -25,6 +25,11 @@ class AssessmentState(TypedDict, total=False):
     next: str
     step_budget: int
     report: str | None
+    # Parallel fan-out: sub-targets (subdomains/URLs/hosts) to scan concurrently.
+    subtargets: list[str]
+    # Reflection loop: remaining verification passes and current reflection phase.
+    verify_budget: int
+    reflection: str
 
 
 def new_state(
@@ -32,6 +37,8 @@ def new_state(
     objective: str = "comprehensive",
     authorized: bool = False,
     step_budget: int | None = None,
+    verify_budget: int = 1,
+    subtargets: list[str] | None = None,
 ) -> AssessmentState:
     budget = step_budget if step_budget is not None else get_settings().step_budget
     return AssessmentState(
@@ -46,6 +53,9 @@ def new_state(
         next="supervisor",
         step_budget=budget,
         report=None,
+        subtargets=list(subtargets or []),
+        verify_budget=verify_budget,
+        reflection="pending",
     )
 
 

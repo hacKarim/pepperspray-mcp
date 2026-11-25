@@ -18,3 +18,15 @@ def test_findings_reducer_appends():
     ann = AssessmentState.__annotations__["findings"]
     # Annotated[list, operator.add] -> metadata contains operator.add
     assert operator.add in getattr(ann, "__metadata__", ())
+
+
+def test_new_state_has_fanout_and_verify_fields():
+    s = new_state(target="t", verify_budget=2)
+    assert s["subtargets"] == []
+    assert s["verify_budget"] == 2
+    assert s["reflection"] == "pending"
+
+
+def test_subtargets_and_verify_in_schema():
+    assert "subtargets" in AssessmentState.__annotations__
+    assert "verify_budget" in AssessmentState.__annotations__
