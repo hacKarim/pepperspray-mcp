@@ -64,3 +64,13 @@ def test_unauthorized_active_tool_records_refusal():
              "messages": [HumanMessage("go")]}
     out = node(state)  # must not raise
     assert out["next"] == "supervisor"
+
+
+def test_build_specialists_covers_roster():
+    from pepperspray.agents.specialists import SPECIALISTS, build_specialists
+    from pepperspray.tools import load_all
+    load_all()
+    nodes = build_specialists(_ctx(), llm=None, agent_factory=_FakeAgent)
+    assert set(nodes) == set(SPECIALISTS)
+    assert "recon" in nodes and "cve" in nodes
+    assert callable(nodes["recon"])

@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 AGENTS = [
-    "recon", "scanning", "web", "exploitation", "binary",
+    "recon", "web", "exploitation", "binary",
     "cloud", "forensics", "cve", "reporting",
 ]
 
