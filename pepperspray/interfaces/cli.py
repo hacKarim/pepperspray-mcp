@@ -14,12 +14,31 @@ from __future__ import annotations
 import typer
 
 from pepperspray.config import get_settings
-from pepperspray.graph.build import run_assessment
+from pepperspray.graph.build import run_assessment, stream_assessment, stream_resume
 from pepperspray.graph.chains import CHAINS, run_chain
 from pepperspray.llm.provider import get_llm
 from pepperspray.tools import load_all
 
 app = typer.Typer(help="PepperSpray — LangGraph multi-agent security assessment framework.")
+
+
+def _render_stream(events) -> None:
+    """Print a live line per graph step, then the report or an approval prompt."""
+    for ev in events:
+        if ev["type"] == "step":
+            extra = f"  (+{ev['findings_delta']} findings)" if ev["findings_delta"] else ""
+            typer.echo(f"  → {ev['node']}{extra}")
+        elif ev["type"] == "approval":
+            req = ev.get("request") or {}
+            typer.echo(
+                "\n⏸  Paused before exploitation-class actions "
+                f"({', '.join(ev['awaiting'])}).\n"
+                f"    {req.get('message', '')}\n"
+                "    Resume:  pepperspray resume <thread-id>                       # approve\n"
+                "             pepperspray resume <thread-id> --no-allow-exploitation  # deny"
+            )
+        elif ev["type"] == "report":
+            typer.echo("\n" + (ev.get("report") or "(no report produced)"))
 
 
 def _require_auth(authorized: bool) -> None:
@@ -50,11 +69,32 @@ def run(
         help="Run the critic/verify reflection loop before reporting.",
     ),
     verify_budget: int = typer.Option(1, help="Max reflection verify passes."),
+    stream: bool = typer.Option(
+        False, "--stream/--no-stream", help="Show each agent/step live as it runs."
+    ),
+    thread_id: str = typer.Option("assessment", help="Run id (use to resume a paused run)."),
 ) -> None:
     """Run the full supervisor/specialist assessment graph."""
     _require_auth(authorized)
     load_all()
     llm = get_llm(model=model) if model else get_llm()
+
+    if stream:
+        typer.echo(f"▶  Streaming assessment of {target} (thread: {thread_id})")
+        _render_stream(
+            stream_assessment(
+                target=target,
+                objective=objective,
+                authorized=authorized,
+                llm=llm,
+                interrupt_exploitation=not allow_exploitation,
+                reflect=reflect,
+                verify_budget=verify_budget,
+                thread_id=thread_id,
+            )
+        )
+        return
+
     final = run_assessment(
         target=target,
         objective=objective,
@@ -63,6 +103,7 @@ def run(
         interrupt_exploitation=not allow_exploitation,
         reflect=reflect,
         verify_budget=verify_budget,
+        thread_id=thread_id,
     )
     typer.echo(final.get("report") or "(no report produced)")
     if final.get("awaiting_approval"):
@@ -123,6 +164,9 @@ def resume(
         "--allow-exploitation/--no-allow-exploitation",
         help="Approve the pending exploitation step and continue.",
     ),
+    stream: bool = typer.Option(
+        False, "--stream/--no-stream", help="Show each agent/step live as it runs."
+    ),
 ) -> None:
     """Resume a durable run that paused at the exploitation gate.
 
@@ -139,8 +183,14 @@ def resume(
         raise typer.Exit(code=2)
     ctx = ToolContext(executor=SafeCommandExecutor(300), cache=ResultCache())
     decision = "approve" if allow_exploitation else "deny"
-    final = resume_after_approval(ctx, thread_id=thread_id, decision=decision, llm=get_llm())
     verb = "approved" if allow_exploitation else "denied"
+
+    if stream:
+        typer.echo(f"▶  Exploitation {verb}; streaming resume (thread: {thread_id})")
+        _render_stream(stream_resume(ctx, thread_id=thread_id, decision=decision, llm=get_llm()))
+        return
+
+    final = resume_after_approval(ctx, thread_id=thread_id, decision=decision, llm=get_llm())
     typer.echo(f"Exploitation {verb}; run resumed.\n")
     typer.echo(final.get("report") or "(no report produced)")
 

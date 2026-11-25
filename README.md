@@ -70,6 +70,13 @@ server, so you can drive it autonomously or from an MCP client like Claude Code.
   records a finding and routes back to the supervisor instead of exploiting.
   The reflection verifier is non-stub: it re-runs a finding's read-only tool to
   confirm it (never re-running exploitation-class tools).
+- **Live streaming.** Watch the graph work in real time — one line per
+  superstep (which specialist ran, how many findings it added) — instead of
+  waiting for the final report. Streaming honors the HITL pause and resume:
+  ```bash
+  pepperspray run --target https://target.example --authorized --stream
+  pepperspray resume <thread-id> --stream        # stream the approved continuation
+  ```
 - **Durable persistence + time-travel.** Set `PEPPERSPRAY_CHECKPOINT_DB` to
   persist runs to SQLite: a run can **pause at exploitation, survive a restart,
   and resume on approval**. Inspect and resume durable runs:

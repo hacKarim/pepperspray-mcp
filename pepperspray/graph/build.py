@@ -9,7 +9,7 @@ report and ends. Exploitation can be gated behind a human-in-the-loop interrupt.
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import Any, Callable, Iterator
 
 from langgraph.graph import END, START, StateGraph
 
@@ -132,6 +132,47 @@ def run_assessment(
     recursion_limit: int = 50,
 ) -> dict:
     """Run a full assessment and return the final state (incl. the report)."""
+    graph, state, config = _assessment_graph(
+        target,
+        objective,
+        authorized,
+        ctx,
+        llm,
+        registry,
+        agent_factory,
+        router,
+        checkpointer,
+        interrupt_exploitation,
+        reflect,
+        scorer,
+        verifier,
+        verify_budget,
+        thread_id,
+        recursion_limit,
+    )
+    result = graph.invoke(state, config=config)
+    return _finalize(graph, config, result)
+
+
+def _assessment_graph(
+    target,
+    objective,
+    authorized,
+    ctx,
+    llm,
+    registry,
+    agent_factory,
+    router,
+    checkpointer,
+    interrupt_exploitation,
+    reflect,
+    scorer,
+    verifier,
+    verify_budget,
+    thread_id,
+    recursion_limit,
+):
+    """Shared setup for both the blocking and streaming entry points."""
     if ctx is None:
         from pepperspray.core.cache import ResultCache
         from pepperspray.core.executor import SafeCommandExecutor
@@ -157,8 +198,7 @@ def run_assessment(
     # reachable even for large budgets (2 hops per supervisor cycle + slack).
     effective_limit = max(recursion_limit, state["step_budget"] * 2 + 10)
     config = {"configurable": {"thread_id": thread_id}, "recursion_limit": effective_limit}
-    result = graph.invoke(state, config=config)
-    return _finalize(graph, config, result)
+    return graph, state, config
 
 
 def _finalize(graph: Any, config: dict, result: dict) -> dict:
@@ -218,8 +258,12 @@ def resume_after_approval(
         verifier=verifier,
     )
     config = {"configurable": {"thread_id": thread_id}, "recursion_limit": recursion_limit}
+    result = graph.invoke(Command(resume=_decision_payload(decision, edit)), config=config)
+    return _finalize(graph, config, result)
 
-    # Normalize the decision into the payload the gate's _parse_decision expects.
+
+def _decision_payload(decision: str | dict, edit: dict | None) -> dict:
+    """Normalize an operator decision into the payload the HITL gate expects."""
     if isinstance(decision, dict):
         payload: dict = dict(decision)
         if edit is not None:
@@ -228,6 +272,125 @@ def resume_after_approval(
         payload = {"decision": decision}
         if edit is not None:
             payload["edit"] = edit
+    return payload
 
-    result = graph.invoke(Command(resume=payload), config=config)
-    return _finalize(graph, config, result)
+
+# --- Streaming -------------------------------------------------------------
+#
+# The streaming entry points mirror run_assessment / resume_after_approval but
+# yield one event per graph superstep instead of blocking for the final state:
+#
+#   {"type": "step",     "node": str, "completed": [...], "findings_delta": int}
+#   {"type": "approval", "request": {...}, "awaiting": ["exploitation"]}
+#   {"type": "report",   "report": str, "state": {...}}
+#
+# so a CLI (or MCP client) can show each agent working live and still honor the
+# human-in-the-loop pause.
+
+
+def stream_assessment(
+    target: str,
+    objective: str = "comprehensive",
+    authorized: bool = False,
+    ctx: ToolContext | None = None,
+    llm: Any = None,
+    registry: ToolRegistry = REGISTRY,
+    agent_factory: Callable | None = None,
+    router: Callable | None = None,
+    checkpointer: Any = None,
+    interrupt_exploitation: bool = True,
+    reflect: bool = True,
+    scorer: Callable | None = None,
+    verifier: Callable | None = None,
+    verify_budget: int = 1,
+    thread_id: str = "assessment",
+    recursion_limit: int = 50,
+) -> Iterator[dict]:
+    """Stream a full assessment, yielding a typed event per superstep."""
+    graph, state, config = _assessment_graph(
+        target,
+        objective,
+        authorized,
+        ctx,
+        llm,
+        registry,
+        agent_factory,
+        router,
+        checkpointer,
+        interrupt_exploitation,
+        reflect,
+        scorer,
+        verifier,
+        verify_budget,
+        thread_id,
+        recursion_limit,
+    )
+    yield from _stream_events(graph, state, config)
+
+
+def stream_resume(
+    ctx: ToolContext,
+    thread_id: str,
+    decision: str | dict = "approve",
+    edit: dict | None = None,
+    llm: Any = None,
+    registry: ToolRegistry = REGISTRY,
+    agent_factory: Callable | None = None,
+    router: Callable | None = None,
+    checkpointer: Any = None,
+    reflect: bool = True,
+    scorer: Callable | None = None,
+    verifier: Callable | None = None,
+    recursion_limit: int = 50,
+) -> Iterator[dict]:
+    """Stream a resume of a run paused at the HITL gate (same thread_id)."""
+    from langgraph.types import Command
+
+    graph = build_graph(
+        ctx,
+        llm=llm,
+        registry=registry,
+        agent_factory=agent_factory,
+        router=router,
+        checkpointer=checkpointer,
+        interrupt_exploitation=True,
+        reflect=reflect,
+        scorer=scorer,
+        verifier=verifier,
+    )
+    config = {"configurable": {"thread_id": thread_id}, "recursion_limit": recursion_limit}
+    yield from _stream_events(graph, Command(resume=_decision_payload(decision, edit)), config)
+
+
+def _stream_events(graph: Any, graph_input: Any, config: dict) -> Iterator[dict]:
+    """Drive graph.stream(updates) and translate chunks into typed events."""
+    interrupt_payload: Any = None
+    for chunk in graph.stream(graph_input, config=config, stream_mode="updates"):
+        if "__interrupt__" in chunk:
+            intr = chunk["__interrupt__"]
+            interrupt_payload = getattr(intr[0], "value", None) if intr else None
+            continue
+        for node, update in chunk.items():
+            update = update or {}
+            yield {
+                "type": "step",
+                "node": node,
+                "completed": list(update.get("completed_steps") or []),
+                "findings_delta": len(update.get("findings") or []),
+            }
+
+    snapshot = graph.get_state(config)
+    if snapshot.next:
+        action = interrupt_payload.get("action") if isinstance(interrupt_payload, dict) else None
+        yield {
+            "type": "approval",
+            "request": interrupt_payload or {},
+            "awaiting": [action] if action else list(snapshot.next),
+        }
+    else:
+        vals = dict(snapshot.values)
+        yield {
+            "type": "report",
+            "report": vals.get("report") or render_report(vals),
+            "state": vals,
+        }

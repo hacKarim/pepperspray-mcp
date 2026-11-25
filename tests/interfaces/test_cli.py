@@ -47,6 +47,39 @@ def test_run_surfaces_exploitation_pause(monkeypatch):
     assert "--allow-exploitation" in result.stdout
 
 
+def test_run_stream_prints_steps_and_report(monkeypatch):
+    monkeypatch.setattr(cli, "get_llm", lambda *a, **k: object())
+
+    def fake_stream(**kw):
+        yield {"type": "step", "node": "recon", "completed": ["recon"], "findings_delta": 2}
+        yield {"type": "report", "report": "# Report for " + kw["target"], "state": {}}
+
+    monkeypatch.setattr(cli, "stream_assessment", fake_stream)
+    result = runner.invoke(cli.app, ["run", "--target", "example.com", "--authorized", "--stream"])
+    assert result.exit_code == 0
+    assert "→ recon" in result.stdout
+    assert "+2 findings" in result.stdout
+    assert "Report for example.com" in result.stdout
+
+
+def test_run_stream_shows_approval_pause(monkeypatch):
+    monkeypatch.setattr(cli, "get_llm", lambda *a, **k: object())
+
+    def fake_stream(**kw):
+        yield {"type": "step", "node": "recon", "completed": ["recon"], "findings_delta": 0}
+        yield {
+            "type": "approval",
+            "request": {"action": "exploitation", "message": "Approve?"},
+            "awaiting": ["exploitation"],
+        }
+
+    monkeypatch.setattr(cli, "stream_assessment", fake_stream)
+    result = runner.invoke(cli.app, ["run", "--target", "t", "--authorized", "--stream"])
+    assert result.exit_code == 0
+    assert "Paused before exploitation" in result.stdout
+    assert "resume" in result.stdout.lower()
+
+
 def test_resume_requires_checkpoint_db(monkeypatch):
     import pepperspray.config as cfg
 
