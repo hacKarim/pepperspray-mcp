@@ -65,3 +65,12 @@ def test_cache_hit_skips_second_run():
 def test_classify_error_known():
     assert classify_error("command not found", 127) == "tool_not_found"
     assert classify_error("Connection timed out", 1) == "timeout"
+
+
+def test_build_input_passed_as_stdin():
+    reg = ToolRegistry()
+    reg.register(ToolSpec(name="rev", family="recon", executor_kind="shell",
+                          build_argv=lambda p: ["rev"],
+                          build_input=lambda p: p["text"]))
+    r = reg.execute("rev", {"text": "abc"}, _ctx(), authorized=True)
+    assert r.status == "success" and r.stdout.strip() == "cba"

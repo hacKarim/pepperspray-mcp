@@ -35,6 +35,7 @@ class ToolSpec:
     executor_kind: ExecutorKind = "shell"
     binary: str | None = None
     build_argv: Callable[[dict], list[str]] | None = None
+    build_input: Callable[[dict], str | None] | None = None
     run: Callable[[dict, ToolContext], ToolResult] | None = None
     timeout: int | None = None
     cacheable: bool = False
@@ -103,7 +104,8 @@ class ToolRegistry:
                 return ToolResult(tool=spec.name, status="failed",
                                   error="shell tool has no build_argv")
             argv = spec.build_argv(params)
-            return ctx.executor.run(spec.name, argv, timeout=spec.timeout)
+            input_text = spec.build_input(params) if spec.build_input else None
+            return ctx.executor.run(spec.name, argv, timeout=spec.timeout, input_text=input_text)
         # python / http / orchestrator
         if spec.run is None:
             return ToolResult(tool=spec.name, status="failed",
