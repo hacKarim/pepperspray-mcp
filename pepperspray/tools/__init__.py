@@ -13,9 +13,11 @@ def load_all() -> None:
         return
     from pepperspray.tools import cve_intel, flag_tools  # noqa: F401
     from pepperspray.tools.specs import (  # noqa: F401
-        cloud_forensics,
+        binary,
+        cloud,
+        exploitation,
+        forensics,
         http_framework,
-        offense,
         python_tools,
         recon,
         system,

@@ -7,8 +7,22 @@ through a shell. Core parameters are always appended as single argv elements.
 
 from __future__ import annotations
 
+import os
 import shlex
+import tempfile
 from typing import Any
+
+
+def write_temp(content: str, prefix: str, suffix: str) -> str:
+    """Write *content* to a fresh temp file and return its path.
+
+    Used by tools whose legacy form wrote a script/resource file and invoked an
+    interpreter on it (metasploit .rc, gdb/r2 command files, pwntools/angr .py).
+    """
+    fd, path = tempfile.mkstemp(prefix=prefix, suffix=suffix)
+    with os.fdopen(fd, "w") as fh:
+        fh.write(content if isinstance(content, str) else str(content))
+    return path
 
 
 def extra(params: dict, key: str = "additional_args") -> list[str]:
