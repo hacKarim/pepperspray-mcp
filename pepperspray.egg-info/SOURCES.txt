@@ -1,0 +1,12 @@
+LICENSE
+README.md
+pyproject.toml
+pepperspray/__init__.py
+pepperspray/config.py
+pepperspray.egg-info/PKG-INFO
+pepperspray.egg-info/SOURCES.txt
+pepperspray.egg-info/dependency_links.txt
+pepperspray.egg-info/entry_points.txt
+pepperspray.egg-info/requires.txt
+pepperspray.egg-info/top_level.txt
+tests/test_config.py

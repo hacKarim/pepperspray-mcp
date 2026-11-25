@@ -1,0 +1,2 @@
+[console_scripts]
+pepperspray = pepperspray.interfaces.cli:app
