@@ -26,6 +26,7 @@ dependencies = [
 [project.optional-dependencies]
 openai = ["langchain-openai>=0.2"]
 ollama = ["langchain-ollama>=0.2"]
+browser = ["playwright>=1.40"]
 dev = ["pytest>=8", "ruff", "black"]
 
 [project.scripts]

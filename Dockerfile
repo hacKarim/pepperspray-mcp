@@ -66,8 +66,9 @@ RUN mkdir -p /opt/ghidra && cd /tmp && \
 # Python-based security tools (binary/forensics/cloud)
 RUN python3 -m pip install --no-cache-dir --break-system-packages \
     ropgadget one-gadget volatility3 angr pwntools uro \
-    checkov prowler scoutsuite kube-hunter autorecon pacu cloudmapper \
+    checkov prowler scoutsuite kube-hunter autorecon pacu cloudmapper playwright \
     || echo "warning: optional python tool failed, continuing"
+RUN python3 -m playwright install --with-deps chromium || echo "warning: playwright browser install failed, continuing"
 
 WORKDIR /app
 

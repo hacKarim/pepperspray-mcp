@@ -136,6 +136,42 @@ def _run_schema_analyzer(params: dict, ctx: ToolContext) -> ToolResult:
     return _ok("api_schema_analyzer", {"path_count": len(paths), "paths": paths[:50]})
 
 
+def _run_burpsuite_scan(params: dict, ctx: ToolContext) -> ToolResult:
+    """Start a scan on a running Burp Suite Pro via its REST API.
+
+    Drives real Burp (not an alternative) through the official REST API, which is
+    how Burp automation is wired. Requires Burp Pro with the REST API enabled
+    (default http://127.0.0.1:1337). Returns the scan task location/id.
+    """
+    url = params.get("url") or params.get("target", "")
+    if not url:
+        return ToolResult(tool="burpsuite_scan", status="failed", error="url required")
+    api_url = str(params.get("api_url", "http://127.0.0.1:1337")).rstrip("/")
+    api_key = params.get("api_key", "")
+    endpoint = f"{api_url}/{api_key + '/' if api_key else ''}v0.1/scan"
+    body: dict = {"urls": [url]}
+    if params.get("scope"):
+        body["scope"] = params["scope"]
+    try:
+        resp = httpx.post(endpoint, json=body, timeout=30)
+    except httpx.HTTPError as exc:
+        return ToolResult(
+            tool="burpsuite_scan",
+            status="failed",
+            error=f"Burp REST API unreachable ({exc}); is Burp Pro running?",
+        )
+    if resp.status_code not in (200, 201):
+        return ToolResult(
+            tool="burpsuite_scan",
+            status="failed",
+            error=f"Burp API returned {resp.status_code}: {resp.text[:200]}",
+        )
+    task = resp.headers.get("Location", "") or resp.text
+    return _ok(
+        "burpsuite_scan", {"scan_task": task, "status_code": resp.status_code, "target": url}
+    )
+
+
 _HTTP_SPECS = [
     (
         "http_repeater",
@@ -164,6 +200,11 @@ _HTTP_SPECS = [
         "api_schema_analyzer",
         _run_schema_analyzer,
         {"description": "Analyze an OpenAPI/GraphQL schema"},
+    ),
+    (
+        "burpsuite_scan",
+        _run_burpsuite_scan,
+        {"active": True, "description": "Start a scan on real Burp Suite Pro via its REST API"},
     ),
 ]
 

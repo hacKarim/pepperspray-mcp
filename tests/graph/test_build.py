@@ -119,3 +119,20 @@ def test_reflection_loop_verifies_findings():
     assert final.get("curated_findings"), "critic should produce curated findings"
     assert any(f.get("verified") for f in final["curated_findings"]), "verify pass should run"
     assert final.get("report") and "Verified" in final["report"]
+
+
+def test_named_bugbounty_chains_run():
+    load_all()
+    from pepperspray.graph.chains import CHAINS, run_chain
+
+    for name in [
+        "bugbounty_osint",
+        "bugbounty_file_upload",
+        "bugbounty_business_logic",
+        "bugbounty_auth_bypass",
+    ]:
+        assert name in CHAINS
+        final = run_chain(
+            name, "example.com", authorized=True, ctx=_ctx(), agent_factory=_FakeAgent
+        )
+        assert final.get("report")

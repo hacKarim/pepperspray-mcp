@@ -18,6 +18,11 @@ CHAINS: dict[str, list[str]] = {
     "recon_chain": ["recon"],
     "bugbounty_recon": ["recon", "web"],
     "comprehensive_assessment": ["recon", "web", "cve"],
+    # Named bug-bounty workflows (callable directly; the agents do the work).
+    "bugbounty_osint": ["recon"],
+    "bugbounty_file_upload": ["web"],
+    "bugbounty_business_logic": ["web"],
+    "bugbounty_auth_bypass": ["web", "exploitation"],
 }
 
 
