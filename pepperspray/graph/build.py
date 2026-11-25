@@ -11,7 +11,6 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 
 from pepperspray.agents.critic import critic_node, route_reflection, verify_node
@@ -20,6 +19,7 @@ from pepperspray.agents.supervisor import supervisor_node
 from pepperspray.core.messages import AGENTS
 from pepperspray.core.registry import REGISTRY, ToolContext, ToolRegistry
 from pepperspray.core.state import AssessmentState, new_state
+from pepperspray.graph.persistence import get_checkpointer
 from pepperspray.graph.routing import route_from_supervisor
 from pepperspray.reporting.report import render_report
 
@@ -73,7 +73,11 @@ def build_graph(
 
     graph.add_edge("reporting", END)
 
-    compile_kwargs: dict[str, Any] = {"checkpointer": checkpointer or MemorySaver()}
+    if checkpointer is None:
+        from pepperspray.config import get_settings
+
+        checkpointer = get_checkpointer(get_settings().checkpoint_db)
+    compile_kwargs: dict[str, Any] = {"checkpointer": checkpointer}
     if interrupt_exploitation:
         compile_kwargs["interrupt_before"] = ["exploitation"]
     return graph.compile(**compile_kwargs)

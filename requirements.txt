@@ -1,6 +1,7 @@
 # Core runtime for PepperSpray (LangGraph multi-agent framework).
 # Heavy security toolchain binaries live in the Docker image.
 langgraph>=0.2
+langgraph-checkpoint-sqlite>=2.0
 langchain-core>=0.3
 langchain-anthropic>=0.2
 pydantic>=2

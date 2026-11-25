@@ -115,6 +115,62 @@ def list_tools(family: str = typer.Option(None, help="Filter by family.")) -> No
 
 
 @app.command()
+def resume(
+    thread_id: str = typer.Argument(..., help="Thread id of a paused run."),
+    allow_exploitation: bool = typer.Option(
+        True,
+        "--allow-exploitation/--no-allow-exploitation",
+        help="Approve the pending exploitation step and continue.",
+    ),
+) -> None:
+    """Resume a durable run that paused at the exploitation gate.
+
+    Requires PEPPERSPRAY_CHECKPOINT_DB to be set (same db as the original run).
+    """
+    load_all()
+    from pepperspray.core.cache import ResultCache
+    from pepperspray.core.executor import SafeCommandExecutor
+    from pepperspray.core.registry import ToolContext
+    from pepperspray.graph.build import resume_after_approval
+
+    if not get_settings().checkpoint_db:
+        typer.echo("Set PEPPERSPRAY_CHECKPOINT_DB to the run's db to resume.")
+        raise typer.Exit(code=2)
+    if not allow_exploitation:
+        typer.echo("Resume declined; the run stays paused.")
+        raise typer.Exit(code=0)
+    ctx = ToolContext(executor=SafeCommandExecutor(300), cache=ResultCache())
+    final = resume_after_approval(ctx, thread_id=thread_id, llm=get_llm())
+    typer.echo(final.get("report") or "(no report produced)")
+
+
+@app.command()
+def history(thread_id: str = typer.Argument(..., help="Thread id to inspect.")) -> None:
+    """Show the checkpoint history (time-travel) of a durable run."""
+    load_all()
+    from pepperspray.core.cache import ResultCache
+    from pepperspray.core.executor import SafeCommandExecutor
+    from pepperspray.core.registry import ToolContext
+    from pepperspray.graph.build import build_graph
+    from pepperspray.graph.persistence import get_checkpointer, list_checkpoints
+
+    cp = get_checkpointer(get_settings().checkpoint_db)
+    ctx = ToolContext(executor=SafeCommandExecutor(5), cache=ResultCache())
+    graph = build_graph(ctx, checkpointer=cp)
+    rows = list_checkpoints(graph, thread_id)
+    if not rows:
+        typer.echo(f"No checkpoints for thread '{thread_id}'.")
+        return
+    typer.echo(f"{len(rows)} checkpoints for '{thread_id}' (newest first):")
+    for r in rows:
+        nxt = ",".join(r["next"]) or "END"
+        typer.echo(
+            f"  {r['checkpoint_id'][:8]}  next={nxt:12} "
+            f"steps={r['completed_steps']} findings={r['findings']}"
+        )
+
+
+@app.command()
 def mcp() -> None:
     """Launch the MCP server over stdio."""
     from pepperspray.interfaces.mcp_server import main as mcp_main
