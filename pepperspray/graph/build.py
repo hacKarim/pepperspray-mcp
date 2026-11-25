@@ -228,6 +228,10 @@ def _assessment_graph(
     # reachable even for large budgets (2 hops per supervisor cycle + slack).
     effective_limit = max(recursion_limit, state["step_budget"] * 2 + 10)
     config = {"configurable": {"thread_id": thread_id}, "recursion_limit": effective_limit}
+    # Attach LangSmith trace metadata when tracing is enabled (no-op otherwise).
+    from pepperspray.obs import trace_config
+
+    config.update(trace_config(target, objective, thread_id))
     return graph, state, config
 
 

@@ -38,6 +38,12 @@ class Settings(BaseSettings):
     checkpoint_db: str | None = None
     step_budget: int = 12
 
+    # Observability (LangSmith) — opt-in; off by default so no run data leaves
+    # the host unless explicitly enabled.
+    langsmith_tracing: bool = False
+    langsmith_project: str = "pepperspray"
+    langsmith_api_key: str | None = None
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

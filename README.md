@@ -70,6 +70,16 @@ server, so you can drive it autonomously or from an MCP client like Claude Code.
   records a finding and routes back to the supervisor instead of exploiting.
   The reflection verifier is non-stub: it re-runs a finding's read-only tool to
   confirm it (never re-running exploitation-class tools).
+- **Resilient nodes.** Every I/O node carries a retry policy (exponential
+  backoff; never retries an authorization failure), and specialist nodes carry
+  a per-run cache — re-dispatching the same specialist on the same target is
+  served from cache instead of re-scanning.
+- **Self-routing gate (`Command(goto=…)`).** The exploitation gate routes
+  itself to the specialist (approve) or back to the supervisor (deny) from
+  inside the node, rather than through a separate edge function.
+- **LangSmith tracing (opt-in).** Set `PEPPERSPRAY_LANGSMITH_TRACING=true` to
+  emit full run traces (tagged with the target/objective) to LangSmith. Off by
+  default — nothing leaves the host unless you enable it.
 - **Live streaming.** Watch the graph work in real time — one line per
   superstep (which specialist ran, how many findings it added) — instead of
   waiting for the final report. Streaming honors the HITL pause and resume:

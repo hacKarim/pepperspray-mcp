@@ -17,6 +17,7 @@ from pepperspray.config import get_settings
 from pepperspray.graph.build import run_assessment, stream_assessment, stream_resume
 from pepperspray.graph.chains import CHAINS, run_chain
 from pepperspray.llm.provider import get_llm
+from pepperspray.obs import configure_tracing
 from pepperspray.tools import load_all
 
 app = typer.Typer(help="PepperSpray — LangGraph multi-agent security assessment framework.")
@@ -77,6 +78,7 @@ def run(
     """Run the full supervisor/specialist assessment graph."""
     _require_auth(authorized)
     load_all()
+    configure_tracing()
     llm = get_llm(model=model) if model else get_llm()
 
     if stream:
@@ -126,6 +128,7 @@ def chain(
     """Run a named fixed workflow (or 'parallel_scan' for concurrent fan-out)."""
     _require_auth(authorized)
     load_all()
+    configure_tracing()
     if name == "parallel_scan":
         # Fan-out scanning is deterministic — no LLM required.
         from pepperspray.graph.parallel import run_parallel_scan
@@ -173,6 +176,7 @@ def resume(
     Requires PEPPERSPRAY_CHECKPOINT_DB to be set (same db as the original run).
     """
     load_all()
+    configure_tracing()
     from pepperspray.core.cache import ResultCache
     from pepperspray.core.executor import SafeCommandExecutor
     from pepperspray.core.registry import ToolContext
