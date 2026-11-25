@@ -1,44 +1,29 @@
 services:
-  # Flask API Server - Runs security tools
-  pepperspray-server:
+  pepperspray:
     build: .
-    container_name: pepperspray-server
-    hostname: pepperspray-server
-    ports:
-      - "8888:8888"  # Flask API endpoint
+    image: pepperspray:2.0.0
+    container_name: pepperspray
     environment:
-      - PEPPERSPRAY_PORT=8888
-      - PEPPERSPRAY_HOST=0.0.0.0
-      - DEBUG_MODE=false
-      - COMMAND_TIMEOUT=300
+      - LLM_PROVIDER=${LLM_PROVIDER:-anthropic}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - PEPPERSPRAY_MODEL=${PEPPERSPRAY_MODEL:-claude-opus-4-8}
+      - PEPPERSPRAY_RESULTS_DIR=/app/results
     volumes:
       - ./data/results:/app/results
-      - ./data/cache:/app/cache
-      - ./data/logs:/app/logs
+    # Keep stdin open so the stdio MCP server can be attached:
+    #   docker attach pepperspray        (MCP client)
+    # Or run the CLI ad hoc:
+    #   docker compose run --rm pepperspray pepperspray run --target <t> --authorized
+    stdin_open: true
+    tty: true
     restart: unless-stopped
-    networks:
-      - pepperspray-net
-    command: python3 pepperspray_server.py --port 8888
 
-  # MCP Server with TCP Bridge - Connects AI agents to API
-  pepperspray-mcp:
-    build: .
-    container_name: pepperspray-mcp
-    hostname: pepperspray-mcp
+  # Optional local vulnerable target for authorized integration testing.
+  # Enable with:  docker compose --profile integration up
+  juice-shop:
+    image: bkimminich/juice-shop:latest
+    container_name: pepperspray-juice-shop
+    profiles: ["integration"]
     ports:
-      - "5001:5000"  # MCP TCP bridge (host:5001 -> container:5000)
-    environment:
-      - PEPPERSPRAY_SERVER=http://pepperspray-server:8888
-      - MCP_BRIDGE_PORT=5000
-      - DEBUG_MODE=false
-    depends_on:
-      - pepperspray-server
+      - "3000:3000"
     restart: unless-stopped
-    networks:
-      - pepperspray-net
-    command: python3 tcp_stdio_bridge.py
-
-networks:
-  pepperspray-net:
-    driver: bridge
-    name: pepperspray-network
