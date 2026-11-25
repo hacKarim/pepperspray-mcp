@@ -30,6 +30,10 @@ class AssessmentState(TypedDict, total=False):
     # Reflection loop: remaining verification passes and current reflection phase.
     verify_budget: int
     reflection: str
+    # Critic output (overwrite, no reducer): curated/deduped findings + the subset
+    # the critic flagged for a verification pass.
+    curated_findings: list[dict]
+    to_verify: list[dict]
 
 
 def new_state(

@@ -71,9 +71,11 @@ def make_specialist(
         messages = result.get("messages", [])
 
         tool_results = _harvest_tool_results(messages)
+        findings = _findings_from_results(tool_results, agent=name, target=state.get("target", ""))
         return {
             "messages": messages,
             "tool_results": tool_results,
+            "findings": findings,
             "completed_steps": [name],
             "next": "supervisor",
         }
@@ -85,6 +87,48 @@ def _default_factory(llm: Any, tools: list):
     from langgraph.prebuilt import create_react_agent
 
     return create_react_agent(llm, tools)
+
+
+_SEVERITY_HINTS = {
+    "critical": "critical",
+    "high": "high",
+    "medium": "medium",
+    "low": "low",
+    "sql injection": "high",
+    "xss": "medium",
+    "rce": "critical",
+    "vulnerable": "high",
+    "exposed": "medium",
+}
+
+
+def _infer_severity(text: str) -> str:
+    low = (text or "").lower()
+    for hint, sev in _SEVERITY_HINTS.items():
+        if hint in low:
+            return sev
+    return "info"
+
+
+def _findings_from_results(tool_results: list[dict], agent: str, target: str) -> list[dict]:
+    """Summarize each tool run as a finding the critic and report can work on."""
+    findings: list[dict] = []
+    for tr in tool_results:
+        tool = tr.get("tool", "tool")
+        result = tr.get("result", {})
+        status = result.get("status", "?") if isinstance(result, dict) else "?"
+        blob = ""
+        if isinstance(result, dict):
+            blob = str(result.get("stdout") or result.get("error") or "")
+        findings.append(
+            {
+                "title": f"{tool} on {target}" if target else tool,
+                "severity": _infer_severity(blob),
+                "source": agent,
+                "detail": f"status={status}; {blob[:160]}".strip(),
+            }
+        )
+    return findings
 
 
 def _harvest_tool_results(messages: list) -> list[dict]:

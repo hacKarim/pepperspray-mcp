@@ -84,3 +84,38 @@ def test_unknown_chain_raises():
 
     with pytest.raises(KeyError):
         build_chain("nope", _ctx())
+
+
+def test_reflection_loop_verifies_findings():
+    load_all()
+    from pepperspray.agents.critic import Critique, FindingScore
+
+    def scorer(findings):
+        # flag every finding for verification
+        return Critique(
+            scores=[
+                FindingScore(index=i, confidence=0.5, needs_verification=True)
+                for i in range(len(findings))
+            ]
+        )
+
+    def verifier(finding, ctx):
+        return True  # confirm
+
+    final = run_assessment(
+        "example.com",
+        objective="recon",
+        authorized=True,
+        ctx=_ctx(),
+        router=_SeqRouter(),
+        agent_factory=_FakeAgent,
+        reflect=True,
+        scorer=scorer,
+        verifier=verifier,
+        verify_budget=1,
+        interrupt_exploitation=False,
+        thread_id="reflect-e2e",
+    )
+    assert final.get("curated_findings"), "critic should produce curated findings"
+    assert any(f.get("verified") for f in final["curated_findings"]), "verify pass should run"
+    assert final.get("report") and "Verified" in final["report"]

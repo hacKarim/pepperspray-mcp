@@ -43,6 +43,12 @@ def run(
         "--allow-exploitation/--no-allow-exploitation",
         help="Run exploitation-class steps without pausing for approval.",
     ),
+    reflect: bool = typer.Option(
+        True,
+        "--reflect/--no-reflect",
+        help="Run the critic/verify reflection loop before reporting.",
+    ),
+    verify_budget: int = typer.Option(1, help="Max reflection verify passes."),
 ) -> None:
     """Run the full supervisor/specialist assessment graph."""
     _require_auth(authorized)
@@ -54,6 +60,8 @@ def run(
         authorized=authorized,
         llm=llm,
         interrupt_exploitation=not allow_exploitation,
+        reflect=reflect,
+        verify_budget=verify_budget,
     )
     typer.echo(final.get("report") or "(no report produced)")
     if final.get("awaiting_approval"):
@@ -66,15 +74,24 @@ def run(
 
 @app.command()
 def chain(
-    name: str = typer.Argument(..., help=f"Chain name: {', '.join(sorted(CHAINS))}"),
+    name: str = typer.Argument(..., help=f"Chain name: {', '.join(sorted(CHAINS))}, parallel_scan"),
     target: str = typer.Option(..., help="Target host, URL or domain."),
     authorized: bool = typer.Option(False, "--authorized/--no-authorized"),
+    subtargets: str = typer.Option(
+        "", help="parallel_scan only: comma-separated hosts/URLs to fan out over."
+    ),
 ) -> None:
-    """Run a named fixed workflow."""
+    """Run a named fixed workflow (or 'parallel_scan' for concurrent fan-out)."""
     _require_auth(authorized)
     load_all()
-    llm = get_llm()
-    final = run_chain(name, target=target, authorized=authorized, llm=llm)
+    if name == "parallel_scan":
+        # Fan-out scanning is deterministic — no LLM required.
+        from pepperspray.graph.parallel import run_parallel_scan
+
+        subs = [s.strip() for s in subtargets.split(",") if s.strip()]
+        final = run_parallel_scan(target, subtargets=subs, authorized=authorized)
+    else:
+        final = run_chain(name, target=target, authorized=authorized, llm=get_llm())
     typer.echo(final.get("report") or "(no report produced)")
 
 

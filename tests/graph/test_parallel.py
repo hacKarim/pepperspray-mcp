@@ -30,13 +30,22 @@ def test_parallel_scan_runs_workers_concurrently_and_reduces():
         seen.append(payload["target"])
         return {
             "tool_results": [{"tool": "probe", "target": payload["target"], "status": "success"}],
-            "findings": [{"title": f"host up: {payload['target']}", "severity": "info",
-                          "source": "probe", "detail": ""}],
+            "findings": [
+                {
+                    "title": f"host up: {payload['target']}",
+                    "severity": "info",
+                    "source": "probe",
+                    "detail": "",
+                }
+            ],
         }
 
     final = parallel.run_parallel_scan(
-        "example.com", subtargets=["a.com", "b.com", "c.com"], authorized=True,
-        ctx=_ctx(), worker=fake_worker,
+        "example.com",
+        subtargets=["a.com", "b.com", "c.com"],
+        authorized=True,
+        ctx=_ctx(),
+        worker=fake_worker,
     )
     assert set(seen) == {"a.com", "b.com", "c.com"}  # all three ran
     assert len(final["findings"]) == 3  # reducers merged parallel outputs

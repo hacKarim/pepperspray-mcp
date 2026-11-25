@@ -104,3 +104,21 @@ def test_build_specialists_covers_roster():
     assert set(nodes) == set(SPECIALISTS)
     assert "recon" in nodes and "cve" in nodes
     assert callable(nodes["recon"])
+
+
+def test_specialist_emits_findings_from_tool_runs():
+    reg = _reg_with_echo()
+    node = make_specialist(
+        "recon", ["recon"], "p", ctx=_ctx(), registry=reg, llm=None, agent_factory=_FakeAgent
+    )
+    state = {
+        "target": "example.com",
+        "objective": "recon",
+        "authorized": True,
+        "messages": [HumanMessage("go")],
+        "tool_results": [],
+    }
+    out = node(state)
+    assert out["findings"], "specialist should emit a finding per tool run"
+    f = out["findings"][0]
+    assert f["source"] == "recon" and "echo_tool" in f["title"]

@@ -14,6 +14,7 @@ from typing import Any, Callable
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 
+from pepperspray.agents.critic import critic_node, route_reflection, verify_node
 from pepperspray.agents.specialists import build_specialists
 from pepperspray.agents.supervisor import supervisor_node
 from pepperspray.core.messages import AGENTS
@@ -33,8 +34,16 @@ def build_graph(
     router: Callable | None = None,
     checkpointer: Any = None,
     interrupt_exploitation: bool = True,
+    reflect: bool = True,
+    scorer: Callable | None = None,
+    verifier: Callable | None = None,
 ):
-    """Build and compile the assessment StateGraph."""
+    """Build and compile the assessment StateGraph.
+
+    When ``reflect`` is set, the supervisor's FINISH routes into a critic →
+    (verify → critic)* reflection loop before reporting, so findings are deduped,
+    scored and optionally re-verified. Otherwise it goes straight to reporting.
+    """
     graph = StateGraph(AssessmentState)
 
     graph.add_node("supervisor", lambda state: supervisor_node(state, llm=llm, router=router))
@@ -47,10 +56,21 @@ def build_graph(
 
     graph.add_edge(START, "supervisor")
     path_map = {name: name for name in _SPECIALISTS}
-    path_map["reporting"] = "reporting"
+    # route_from_supervisor returns "reporting" on FINISH; send that into the
+    # reflection loop first when enabled.
+    path_map["reporting"] = "critic" if reflect else "reporting"
     graph.add_conditional_edges("supervisor", route_from_supervisor, path_map)
     for name in _SPECIALISTS:
         graph.add_edge(name, "supervisor")
+
+    if reflect:
+        graph.add_node("critic", lambda s: critic_node(s, scorer=scorer, llm=llm))
+        graph.add_node("verify", lambda s: verify_node(s, verifier=verifier, ctx=ctx))
+        graph.add_conditional_edges(
+            "critic", route_reflection, {"verify": "verify", "reporting": "reporting"}
+        )
+        graph.add_edge("verify", "critic")
+
     graph.add_edge("reporting", END)
 
     compile_kwargs: dict[str, Any] = {"checkpointer": checkpointer or MemorySaver()}
@@ -70,6 +90,10 @@ def run_assessment(
     router: Callable | None = None,
     checkpointer: Any = None,
     interrupt_exploitation: bool = True,
+    reflect: bool = True,
+    scorer: Callable | None = None,
+    verifier: Callable | None = None,
+    verify_budget: int = 1,
     thread_id: str = "assessment",
     recursion_limit: int = 50,
 ) -> dict:
@@ -88,8 +112,13 @@ def run_assessment(
         router=router,
         checkpointer=checkpointer,
         interrupt_exploitation=interrupt_exploitation,
+        reflect=reflect,
+        scorer=scorer,
+        verifier=verifier,
     )
-    state = new_state(target=target, objective=objective, authorized=authorized)
+    state = new_state(
+        target=target, objective=objective, authorized=authorized, verify_budget=verify_budget
+    )
     # Keep the recursion limit ahead of the step budget so FINISH is always
     # reachable even for large budgets (2 hops per supervisor cycle + slack).
     effective_limit = max(recursion_limit, state["step_budget"] * 2 + 10)

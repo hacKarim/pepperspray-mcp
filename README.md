@@ -37,10 +37,25 @@ server, so you can drive it autonomously or from an MCP client like Claude Code.
 
 - **`pepperspray/core/`** — graph state, safe argv executor, tool registry, cache, errors
 - **`pepperspray/tools/`** — the tool specs by family, plus preserved CVE intel and CTF flag tools
-- **`pepperspray/agents/`** — the specialist factory, the nine-way roster, and the supervisor
-- **`pepperspray/graph/`** — the StateGraph assembly, chains, routing, and safety gates
+- **`pepperspray/agents/`** — the specialist factory, the roster, the supervisor, and the **critic** (reflection)
+- **`pepperspray/graph/`** — the StateGraph assembly, chains, **parallel fan-out**, routing, and safety gates
 - **`pepperspray/interfaces/`** — the Typer CLI and the FastMCP server
 - **`legacy/`** — the original v1 Flask/MCP code, kept for reference (to be removed)
+
+### Advanced agentic workflows
+
+- **Parallel fan-out (`Send` API).** The `parallel_scan` chain probes many
+  sub-targets **concurrently** and merges their findings via the append-reducers:
+  `discover → Send(probe_worker) × N → collect → report`.
+  ```bash
+  pepperspray chain parallel_scan --target example.com \
+    --subtargets "a.example.com,b.example.com,c.example.com" --authorized
+  ```
+- **Reflection loop (critic + verify).** After the specialists finish, a critic
+  agent dedupes and scores findings by confidence and flags the weak ones; a
+  verify node re-checks them, looping under `--verify-budget` before reporting.
+  Reports show per-finding **confidence** and a **verified** flag. On by default;
+  disable with `--no-reflect`.
 
 ## Requirements
 

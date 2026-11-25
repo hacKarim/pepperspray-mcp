@@ -10,8 +10,10 @@ _SEV_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
 def render_report(state: dict) -> str:
     target = state.get("target", "unknown")
     objective = state.get("objective", "")
+    # Prefer the critic's curated/verified findings when the reflection pass ran.
+    source_findings = state.get("curated_findings") or state.get("findings", [])
     findings = sorted(
-        state.get("findings", []),
+        source_findings,
         key=lambda f: _SEV_ORDER.get(str(f.get("severity", "info")).lower(), 5),
     )
     tool_results = state.get("tool_results", [])
@@ -32,11 +34,18 @@ def render_report(state: dict) -> str:
     ]
 
     if findings:
-        lines += ["| Severity | Title | Source | Detail |", "|---|---|---|---|"]
+        lines += [
+            "| Severity | Title | Source | Confidence | Verified | Detail |",
+            "|---|---|---|---|---|---|",
+        ]
         for f in findings:
             sev = str(f.get("severity", "info")).upper()
+            conf = f.get("confidence")
+            conf_str = f"{conf:.0%}" if isinstance(conf, (int, float)) else "—"
+            verified = "✓" if f.get("verified") else ("✗" if "verified" in f else "—")
             lines.append(
-                f"| {sev} | {f.get('title', '')} | {f.get('source', '')} | {f.get('detail', '')} |"
+                f"| {sev} | {f.get('title', '')} | {f.get('source', '')} | "
+                f"{conf_str} | {verified} | {f.get('detail', '')} |"
             )
     else:
         lines.append("_No findings recorded._")

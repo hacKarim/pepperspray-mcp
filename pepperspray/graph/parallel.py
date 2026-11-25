@@ -99,6 +99,7 @@ def run_parallel_scan(
 
         ctx = ToolContext(executor=SafeCommandExecutor(300), cache=ResultCache())
     graph = build_parallel_scan(ctx, registry=registry, worker=worker)
-    state = new_state(target=target, objective=objective, authorized=authorized,
-                      subtargets=subtargets or [])
+    state = new_state(
+        target=target, objective=objective, authorized=authorized, subtargets=subtargets or []
+    )
     return graph.invoke(state, config={"configurable": {"thread_id": thread_id}})
