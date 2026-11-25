@@ -58,7 +58,9 @@ def make_specialist(
             name, families, system_prompt, state, ctx, registry, llm, agent_factory
         )
         updates["findings"] = findings
-        updates["next"] = "supervisor"
+        # Routing back to the supervisor is a static edge; the specialist must
+        # not write `next` itself, so several can run in one superstep without
+        # colliding on that single-value channel.
         return updates
 
     return node
@@ -151,6 +153,10 @@ def _findings_from_results(tool_results: list[dict], agent: str, target: str) ->
                 "source": agent,
                 "detail": f"status={status}; {blob[:160]}".strip(),
                 "_status": status,
+                # Verification metadata: which tool produced this and against
+                # what, so the reflection verifier can re-run it to confirm.
+                "_tool": tool,
+                "_target": target,
             }
         )
     return findings

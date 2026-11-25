@@ -22,9 +22,15 @@ class AssessmentState(TypedDict, total=False):
     completed_steps: Annotated[list[str], operator.add]
     tool_results: Annotated[list[dict], operator.add]
     findings: Annotated[list[dict], operator.add]
-    next: str
+    # The supervisor's dispatch: a single specialist name, "FINISH", or a list
+    # of independent specialists to run concurrently in one superstep.
+    next: str | list[str]
     step_budget: int
     report: str | None
+    # Human-in-the-loop: the pending approval payload surfaced at the gate, and
+    # a run-level approval flag so an approved run is not re-prompted per step.
+    approval_request: dict
+    exploitation_approved: bool
     # Parallel fan-out: sub-targets (subdomains/URLs/hosts) to scan concurrently.
     subtargets: list[str]
     # Reflection loop: remaining verification passes and current reflection phase.

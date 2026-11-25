@@ -63,7 +63,8 @@ def test_specialist_node_runs_and_records():
         "tool_results": [],
     }
     out = node(state)
-    assert out["next"] == "supervisor"
+    # Routing is a static edge now; the specialist no longer writes `next`.
+    assert "next" not in out
     assert len(out["tool_results"]) == 1
     assert out["completed_steps"] == ["recon"]
 
@@ -92,7 +93,7 @@ def test_unauthorized_active_tool_records_refusal():
     )
     state = {"target": "x", "objective": "o", "authorized": False, "messages": [HumanMessage("go")]}
     out = node(state)  # must not raise
-    assert out["next"] == "supervisor"
+    assert "next" not in out
 
 
 def test_build_specialists_covers_roster():

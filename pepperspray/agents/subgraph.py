@@ -90,6 +90,31 @@ def make_specialist_subgraph(
     return sub.compile()
 
 
+# Only these channels carry reducers in the parent state; a specialist node may
+# emit only these so that several specialists can run in the same superstep
+# without colliding on a single-value channel (target, next, …). See _as_node.
+_MERGE_KEYS = ("messages", "tool_results", "completed_steps", "findings")
+
+
+def _as_node(compiled: Any) -> Callable[[dict], dict]:
+    """Adapt a compiled specialist subgraph into a concurrency-safe parent node.
+
+    The subgraph runs with zeroed accumulators so its output holds only the
+    rows *it* produced (not the whole history echoed back), and only the
+    reducer-backed channels are returned — both required for the supervisor to
+    fan out to several specialists concurrently.
+    """
+
+    def node(state: dict) -> dict:
+        sub_state = dict(state)
+        for key in ("findings", "tool_results", "completed_steps"):
+            sub_state[key] = []
+        out = compiled.invoke(sub_state)
+        return {k: out[k] for k in _MERGE_KEYS if k in out}
+
+    return node
+
+
 def build_specialist_subgraphs(
     ctx: ToolContext,
     llm: Any = None,
@@ -98,14 +123,16 @@ def build_specialist_subgraphs(
 ) -> dict[str, Any]:
     """Return {name: compiled subgraph} for every tool-backed specialist."""
     return {
-        name: make_specialist_subgraph(
-            name,
-            families,
-            prompt,
-            ctx=ctx,
-            registry=registry,
-            llm=llm,
-            agent_factory=agent_factory,
+        name: _as_node(
+            make_specialist_subgraph(
+                name,
+                families,
+                prompt,
+                ctx=ctx,
+                registry=registry,
+                llm=llm,
+                agent_factory=agent_factory,
+            )
         )
         for name, (families, prompt) in SPECIALISTS.items()
     }

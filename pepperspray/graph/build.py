@@ -20,8 +20,14 @@ from pepperspray.core.messages import AGENTS
 from pepperspray.core.registry import REGISTRY, ToolContext, ToolRegistry
 from pepperspray.core.state import AssessmentState, new_state
 from pepperspray.graph.persistence import get_checkpointer
-from pepperspray.graph.routing import route_from_supervisor
+from pepperspray.graph.routing import (
+    exploitation_gate,
+    route_exploitation_gate,
+    route_from_supervisor,
+)
 from pepperspray.reporting.report import render_report
+
+_EXPLOIT_GATE = "exploitation_gate"
 
 _SPECIALISTS = [a for a in AGENTS if a != "reporting"]
 
@@ -72,11 +78,25 @@ def build_graph(
     # route_from_supervisor returns "reporting" on FINISH; send that into the
     # reflection loop first when enabled.
     path_map["reporting"] = "critic" if reflect else "reporting"
+    # Exploitation is gated behind a dynamic human-in-the-loop interrupt: route
+    # the supervisor's exploitation pick through the gate node instead.
+    if interrupt_exploitation:
+        path_map["exploitation"] = _EXPLOIT_GATE
+        graph.add_node(_EXPLOIT_GATE, exploitation_gate)
+        graph.add_conditional_edges(
+            _EXPLOIT_GATE,
+            route_exploitation_gate,
+            {"exploitation": "exploitation", "supervisor": "supervisor"},
+        )
     graph.add_conditional_edges("supervisor", route_from_supervisor, path_map)
     for name in _SPECIALISTS:
         graph.add_edge(name, "supervisor")
 
     if reflect:
+        if verifier is None:
+            from pepperspray.agents.critic import make_rerun_verifier
+
+            verifier = make_rerun_verifier(registry)
         graph.add_node("critic", lambda s: critic_node(s, scorer=scorer, llm=llm))
         graph.add_node("verify", lambda s: verify_node(s, verifier=verifier, ctx=ctx))
         graph.add_conditional_edges(
@@ -90,10 +110,7 @@ def build_graph(
         from pepperspray.config import get_settings
 
         checkpointer = get_checkpointer(get_settings().checkpoint_db)
-    compile_kwargs: dict[str, Any] = {"checkpointer": checkpointer}
-    if interrupt_exploitation:
-        compile_kwargs["interrupt_before"] = ["exploitation"]
-    return graph.compile(**compile_kwargs)
+    return graph.compile(checkpointer=checkpointer)
 
 
 def run_assessment(
@@ -141,30 +158,53 @@ def run_assessment(
     effective_limit = max(recursion_limit, state["step_budget"] * 2 + 10)
     config = {"configurable": {"thread_id": thread_id}, "recursion_limit": effective_limit}
     result = graph.invoke(state, config=config)
+    return _finalize(graph, config, result)
 
-    # If the graph paused at the exploitation HITL interrupt, it stopped before
-    # the reporting node. Surface a partial report and an approval marker rather
-    # than returning an empty, confusing result.
+
+def _finalize(graph: Any, config: dict, result: dict) -> dict:
+    """If the graph paused at the HITL gate, surface a partial report plus the
+    approval-request payload and marker; otherwise return the result as-is."""
     snapshot = graph.get_state(config)
-    if snapshot.next:
-        result = dict(result)
-        result["awaiting_approval"] = list(snapshot.next)
-        if not result.get("report"):
-            result["report"] = render_report(result)
-    return result
+    if not snapshot.next:
+        return result
+
+    out = dict(snapshot.values)
+    interrupts = (result or {}).get("__interrupt__") or ()
+    payload = getattr(interrupts[0], "value", None) if interrupts else None
+    if isinstance(payload, dict) and payload.get("action"):
+        out["awaiting_approval"] = [payload["action"]]
+        out["approval_request"] = payload
+    else:
+        out["awaiting_approval"] = list(snapshot.next)
+    if not out.get("report"):
+        out["report"] = render_report(out)
+    return out
 
 
 def resume_after_approval(
     ctx: ToolContext,
     thread_id: str,
+    decision: str | dict = "approve",
+    edit: dict | None = None,
     llm: Any = None,
     registry: ToolRegistry = REGISTRY,
     agent_factory: Callable | None = None,
     router: Callable | None = None,
     checkpointer: Any = None,
+    reflect: bool = True,
+    scorer: Callable | None = None,
+    verifier: Callable | None = None,
     recursion_limit: int = 50,
 ) -> dict:
-    """Resume a run paused at the exploitation interrupt (same thread_id)."""
+    """Resume a run paused at the exploitation HITL gate (same thread_id).
+
+    ``decision`` is ``"approve"`` or ``"deny"`` (or a payload dict). ``edit`` is
+    an optional dict of state overrides applied before an approved exploitation
+    step runs (e.g. a narrowed objective). The graph is rebuilt with the gate
+    present so the pending interrupt can be resumed via ``Command(resume=...)``.
+    """
+    from langgraph.types import Command
+
     graph = build_graph(
         ctx,
         llm=llm,
@@ -172,7 +212,22 @@ def resume_after_approval(
         agent_factory=agent_factory,
         router=router,
         checkpointer=checkpointer,
-        interrupt_exploitation=False,
+        interrupt_exploitation=True,
+        reflect=reflect,
+        scorer=scorer,
+        verifier=verifier,
     )
     config = {"configurable": {"thread_id": thread_id}, "recursion_limit": recursion_limit}
-    return graph.invoke(None, config=config)
+
+    # Normalize the decision into the payload the gate's _parse_decision expects.
+    if isinstance(decision, dict):
+        payload: dict = dict(decision)
+        if edit is not None:
+            payload.setdefault("edit", edit)
+    else:
+        payload = {"decision": decision}
+        if edit is not None:
+            payload["edit"] = edit
+
+    result = graph.invoke(Command(resume=payload), config=config)
+    return _finalize(graph, config, result)

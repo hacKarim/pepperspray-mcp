@@ -137,11 +137,11 @@ def resume(
     if not get_settings().checkpoint_db:
         typer.echo("Set PEPPERSPRAY_CHECKPOINT_DB to the run's db to resume.")
         raise typer.Exit(code=2)
-    if not allow_exploitation:
-        typer.echo("Resume declined; the run stays paused.")
-        raise typer.Exit(code=0)
     ctx = ToolContext(executor=SafeCommandExecutor(300), cache=ResultCache())
-    final = resume_after_approval(ctx, thread_id=thread_id, llm=get_llm())
+    decision = "approve" if allow_exploitation else "deny"
+    final = resume_after_approval(ctx, thread_id=thread_id, decision=decision, llm=get_llm())
+    verb = "approved" if allow_exploitation else "denied"
+    typer.echo(f"Exploitation {verb}; run resumed.\n")
     typer.echo(final.get("report") or "(no report produced)")
 
 

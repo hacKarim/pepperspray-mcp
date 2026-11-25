@@ -130,6 +130,35 @@ def _default_verifier(finding: dict, ctx: Any) -> bool:
     return False
 
 
+def make_rerun_verifier(registry: Any, authorized: bool = True) -> Callable[[dict, Any], bool]:
+    """A real verifier: re-run the finding's originating tool and confirm it.
+
+    Uses the ``_tool``/``_target`` metadata each finding carries. A finding is
+    confirmed only when a fresh run of the same read-only tool succeeds again —
+    a reproducible signal, not a one-off. Exploitation-class tools are never
+    auto-rerun to "verify" (that would re-attack the target); they stay
+    unconfirmed for a human to check.
+    """
+
+    def verify(finding: dict, ctx: Any) -> bool:
+        tool = finding.get("_tool")
+        target = finding.get("_target")
+        if not tool or not target or ctx is None:
+            return False
+        spec = registry.get(tool)
+        if spec is None or getattr(spec, "exploitation", False):
+            return False
+        from pepperspray.core.registry import spread_target
+
+        try:
+            result = registry.execute(tool, spread_target(target), ctx, authorized=authorized)
+        except Exception:
+            return False
+        return getattr(result, "status", "") == "success"
+
+    return verify
+
+
 def route_reflection(state: dict) -> str:
     """Conditional edge after the critic: loop to verify, or go to reporting."""
     if state.get("reflection") == "verify" and int(state.get("verify_budget", 0)) > 0:

@@ -59,12 +59,24 @@ server, so you can drive it autonomously or from an MCP client like Claude Code.
 - **Specialists as nested subgraphs.** Each specialist is its own compiled
   `plan → act → verify` subgraph, not a single node — a two-tier reflection
   (local verify inside each specialist, global critic across all findings).
+- **Concurrent specialists.** The supervisor can dispatch several independent
+  specialists (e.g. recon + cve) in a single superstep — they run concurrently
+  and their findings merge through the append-reducers, instead of one agent
+  per hop. Exploitation always runs solo so the human gate reasons about one
+  step at a time.
+- **Real human-in-the-loop (approve / deny / edit).** Exploitation pauses at a
+  dynamic `interrupt()` gate that surfaces an approval-request payload. The
+  operator can **approve** (optionally editing scope first), or **deny** — which
+  records a finding and routes back to the supervisor instead of exploiting.
+  The reflection verifier is non-stub: it re-runs a finding's read-only tool to
+  confirm it (never re-running exploitation-class tools).
 - **Durable persistence + time-travel.** Set `PEPPERSPRAY_CHECKPOINT_DB` to
   persist runs to SQLite: a run can **pause at exploitation, survive a restart,
   and resume on approval**. Inspect and resume durable runs:
   ```bash
-  pepperspray history <thread-id>     # checkpoint timeline
-  pepperspray resume  <thread-id>     # approve exploitation + continue
+  pepperspray history <thread-id>                      # checkpoint timeline
+  pepperspray resume  <thread-id>                      # approve + continue
+  pepperspray resume  <thread-id> --no-allow-exploitation  # deny + finish
   ```
 
 ## Requirements
