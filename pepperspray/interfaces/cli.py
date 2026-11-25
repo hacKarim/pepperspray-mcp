@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import typer
 
+from pepperspray.config import get_settings
 from pepperspray.graph.build import run_assessment
 from pepperspray.graph.chains import CHAINS, run_chain
 from pepperspray.llm.provider import get_llm

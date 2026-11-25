@@ -45,3 +45,22 @@ def test_run_surfaces_exploitation_pause(monkeypatch):
     assert result.exit_code == 0
     assert "Paused before exploitation" in result.stdout
     assert "--allow-exploitation" in result.stdout
+
+
+def test_resume_requires_checkpoint_db(monkeypatch):
+    import pepperspray.config as cfg
+
+    monkeypatch.setattr(cli, "get_settings", lambda: cfg.Settings(checkpoint_db=None))
+    monkeypatch.setattr(cli, "get_llm", lambda *a, **k: object())
+    result = runner.invoke(cli.app, ["resume", "some-thread"])
+    assert result.exit_code == 2
+    assert "CHECKPOINT_DB" in result.stdout
+
+
+def test_history_handles_empty(monkeypatch):
+    import pepperspray.config as cfg
+
+    monkeypatch.setattr(cli, "get_settings", lambda: cfg.Settings(checkpoint_db=None))
+    result = runner.invoke(cli.app, ["history", "nope-thread"])
+    assert result.exit_code == 0
+    assert "No checkpoints" in result.stdout
