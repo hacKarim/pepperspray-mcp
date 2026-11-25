@@ -26,8 +26,9 @@ def test_run_requires_authorization():
 
 def test_run_with_stub(monkeypatch):
     monkeypatch.setattr(cli, "get_llm", lambda *a, **k: object())
-    monkeypatch.setattr(cli, "run_assessment",
-                        lambda **kw: {"report": "# Report for " + kw["target"]})
+    monkeypatch.setattr(
+        cli, "run_assessment", lambda **kw: {"report": "# Report for " + kw["target"]}
+    )
     result = runner.invoke(cli.app, ["run", "--target", "example.com", "--authorized"])
     assert result.exit_code == 0
     assert "Report for example.com" in result.stdout

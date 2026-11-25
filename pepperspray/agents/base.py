@@ -25,7 +25,9 @@ from pepperspray.core.registry import REGISTRY, ToolContext, ToolRegistry
 _TARGET_ALIASES = ("target", "url", "domain", "base_url", "host", "ip")
 
 
-def _make_lc_tool(spec, ctx: ToolContext, registry: ToolRegistry, authorized: bool) -> StructuredTool:
+def _make_lc_tool(
+    spec, ctx: ToolContext, registry: ToolRegistry, authorized: bool
+) -> StructuredTool:
     def _call(target: str = "", extra: str = "") -> str:
         params: dict[str, Any] = {k: target for k in _TARGET_ALIASES}
         if extra:

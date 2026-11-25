@@ -17,10 +17,16 @@ _DIRB_WORDLIST = "/usr/share/wordlists/dirb/common.txt"
 
 # --- content discovery / fuzzing ------------------------------------------
 
+
 def _gobuster(p: dict) -> list[str]:
-    argv = ["gobuster", p.get("mode", "dir"),
-            "-u", p.get("url", ""),
-            "-w", p.get("wordlist", _DIRB_WORDLIST)]
+    argv = [
+        "gobuster",
+        p.get("mode", "dir"),
+        "-u",
+        p.get("url", ""),
+        "-w",
+        p.get("wordlist", _DIRB_WORDLIST),
+    ]
     argv += extra(p)
     return argv
 
@@ -48,20 +54,31 @@ def _ffuf(p: dict) -> list[str]:
 
 
 def _feroxbuster(p: dict) -> list[str]:
-    argv = ["feroxbuster",
-            "-u", p.get("url", ""),
-            "-w", p.get("wordlist", _DIRB_WORDLIST),
-            "-t", str(p.get("threads", 10))]
+    argv = [
+        "feroxbuster",
+        "-u",
+        p.get("url", ""),
+        "-w",
+        p.get("wordlist", _DIRB_WORDLIST),
+        "-t",
+        str(p.get("threads", 10)),
+    ]
     argv += extra(p)
     return argv
 
 
 def _dirsearch(p: dict) -> list[str]:
-    argv = ["dirsearch",
-            "-u", p.get("url", ""),
-            "-e", p.get("extensions", "php,html,js,txt,xml,json"),
-            "-w", p.get("wordlist", "/usr/share/wordlists/dirsearch/common.txt"),
-            "-t", str(p.get("threads", 30))]
+    argv = [
+        "dirsearch",
+        "-u",
+        p.get("url", ""),
+        "-e",
+        p.get("extensions", "php,html,js,txt,xml,json"),
+        "-w",
+        p.get("wordlist", "/usr/share/wordlists/dirsearch/common.txt"),
+        "-t",
+        str(p.get("threads", 30)),
+    ]
     argv += flag("-r", p.get("recursive", False))
     argv += extra(p)
     return argv
@@ -74,6 +91,7 @@ def _wfuzz(p: dict) -> list[str]:
 
 
 # --- traversal / xss -------------------------------------------------------
+
 
 def _dotdotpwn(p: dict) -> list[str]:
     argv = ["dotdotpwn", "-m", p.get("module", "http"), "-h", p.get("target", "")]
@@ -103,6 +121,7 @@ def _dalfox(p: dict) -> list[str]:
 
 
 # --- probing / vuln scanning ----------------------------------------------
+
 
 def _httpx(p: dict) -> list[str]:
     argv = ["httpx", "-l", p.get("target", ""), "-t", str(p.get("threads", 50))]
@@ -134,9 +153,16 @@ def _wpscan(p: dict) -> list[str]:
 
 
 def _jaeles(p: dict) -> list[str]:
-    argv = ["jaeles", "scan", "-u", p.get("url", ""),
-            "-c", str(p.get("threads", 20)),
-            "--timeout", str(p.get("timeout", 20))]
+    argv = [
+        "jaeles",
+        "scan",
+        "-u",
+        p.get("url", ""),
+        "-c",
+        str(p.get("threads", 20)),
+        "--timeout",
+        str(p.get("timeout", 20)),
+    ]
     argv += opt("-s", p.get("signatures"))
     argv += opt("--config", p.get("config"))
     argv += extra(p)
@@ -178,10 +204,17 @@ def _zap(p: dict) -> list[str]:
 
 # --- parameter discovery ---------------------------------------------------
 
+
 def _arjun(p: dict) -> list[str]:
-    argv = ["arjun", "-u", p.get("url", ""),
-            "-m", p.get("method", "GET"),
-            "-t", str(p.get("threads", 25))]
+    argv = [
+        "arjun",
+        "-u",
+        p.get("url", ""),
+        "-m",
+        p.get("method", "GET"),
+        "-t",
+        str(p.get("threads", 25)),
+    ]
     argv += opt("-w", p.get("wordlist"))
     argv += opt("-d", p.get("delay", 0))
     argv += flag("--stable", p.get("stable", False))
@@ -191,17 +224,22 @@ def _arjun(p: dict) -> list[str]:
 
 def _paramspider(p: dict) -> list[str]:
     argv = ["paramspider", "-d", p.get("domain", ""), "-l", str(p.get("level", 2))]
-    argv += opt("--exclude",
-                p.get("exclude", "png,jpg,gif,jpeg,swf,woff,svg,pdf,css,ico"))
+    argv += opt("--exclude", p.get("exclude", "png,jpg,gif,jpeg,swf,woff,svg,pdf,css,ico"))
     argv += opt("-o", p.get("output"))
     argv += extra(p)
     return argv
 
 
 def _x8(p: dict) -> list[str]:
-    argv = ["x8", "-u", p.get("url", ""),
-            "-w", p.get("wordlist", "/usr/share/wordlists/x8/params.txt"),
-            "-X", p.get("method", "GET")]
+    argv = [
+        "x8",
+        "-u",
+        p.get("url", ""),
+        "-w",
+        p.get("wordlist", "/usr/share/wordlists/x8/params.txt"),
+        "-X",
+        p.get("method", "GET"),
+    ]
     argv += opt("-b", p.get("body"))
     argv += opt("-H", p.get("headers"))
     argv += extra(p)
@@ -209,6 +247,7 @@ def _x8(p: dict) -> list[str]:
 
 
 # --- stdin pipeline tools (value flows through stdin, never argv) ----------
+
 
 def _anew(p: dict) -> list[str]:
     return ["anew"] + extra(p)
@@ -228,27 +267,82 @@ def _stdin(p: dict) -> str:
 
 # (name, binary, builder, kwargs) — all web tools touch the network -> active
 _SHELL_SPECS = [
-    ("gobuster_scan", "gobuster", _gobuster, {"description": "Gobuster content/DNS/vhost brute force"}),
+    (
+        "gobuster_scan",
+        "gobuster",
+        _gobuster,
+        {"description": "Gobuster content/DNS/vhost brute force"},
+    ),
     ("dirb_scan", "dirb", _dirb, {"description": "Dirb directory brute force"}),
     ("ffuf_scan", "ffuf", _ffuf, {"description": "ffuf web fuzzer"}),
-    ("feroxbuster_scan", "feroxbuster", _feroxbuster, {"description": "feroxbuster recursive content discovery"}),
+    (
+        "feroxbuster_scan",
+        "feroxbuster",
+        _feroxbuster,
+        {"description": "feroxbuster recursive content discovery"},
+    ),
     ("dirsearch_scan", "dirsearch", _dirsearch, {"description": "dirsearch directory brute force"}),
     ("wfuzz_scan", "wfuzz", _wfuzz, {"description": "wfuzz web fuzzer"}),
-    ("dotdotpwn_scan", "dotdotpwn", _dotdotpwn, {"description": "DotDotPwn directory traversal fuzzer"}),
+    (
+        "dotdotpwn_scan",
+        "dotdotpwn",
+        _dotdotpwn,
+        {"description": "DotDotPwn directory traversal fuzzer"},
+    ),
     ("xsser_scan", "xsser", _xsser, {"description": "XSSer cross-site scripting scanner"}),
     ("dalfox_xss_scan", "dalfox", _dalfox, {"description": "Dalfox XSS scanner"}),
-    ("httpx_probe", "httpx", _httpx, {"description": "httpx HTTP probe", "build_input": lambda p: p.get("target", "")}),
+    (
+        "httpx_probe",
+        "httpx",
+        _httpx,
+        {"description": "httpx HTTP probe", "build_input": lambda p: p.get("target", "")},
+    ),
     ("nikto_scan", "nikto", _nikto, {"description": "Nikto web server scanner"}),
     ("nuclei_scan", "nuclei", _nuclei, {"description": "Nuclei template-based vulnerability scan"}),
     ("wpscan_analyze", "wpscan", _wpscan, {"description": "WPScan WordPress scanner"}),
-    ("jaeles_vulnerability_scan", "jaeles", _jaeles, {"description": "Jaeles signature-based vulnerability scan"}),
-    ("arjun_parameter_discovery", "arjun", _arjun, {"description": "Arjun HTTP parameter discovery"}),
-    ("paramspider_mining", "paramspider", _paramspider, {"description": "ParamSpider parameter mining"}),
+    (
+        "jaeles_vulnerability_scan",
+        "jaeles",
+        _jaeles,
+        {"description": "Jaeles signature-based vulnerability scan"},
+    ),
+    (
+        "arjun_parameter_discovery",
+        "arjun",
+        _arjun,
+        {"description": "Arjun HTTP parameter discovery"},
+    ),
+    (
+        "paramspider_mining",
+        "paramspider",
+        _paramspider,
+        {"description": "ParamSpider parameter mining"},
+    ),
     ("x8_parameter_discovery", "x8", _x8, {"description": "x8 hidden parameter discovery"}),
-    ("anew_data_processing", "anew", _anew, {"description": "anew append-unique stream filter", "build_input": _stdin}),
-    ("qsreplace_parameter_replacement", "qsreplace", _qsreplace, {"description": "qsreplace query-string replacer", "build_input": _stdin}),
-    ("uro_url_filtering", "uro", _uro, {"description": "uro URL list deduplication/filtering", "build_input": _stdin}),
-    ("burpsuite_alternative_scan", "nuclei", _burpsuite_alt, {"description": "Burp Suite alternative active scan (nuclei-based)"}),
+    (
+        "anew_data_processing",
+        "anew",
+        _anew,
+        {"description": "anew append-unique stream filter", "build_input": _stdin},
+    ),
+    (
+        "qsreplace_parameter_replacement",
+        "qsreplace",
+        _qsreplace,
+        {"description": "qsreplace query-string replacer", "build_input": _stdin},
+    ),
+    (
+        "uro_url_filtering",
+        "uro",
+        _uro,
+        {"description": "uro URL list deduplication/filtering", "build_input": _stdin},
+    ),
+    (
+        "burpsuite_alternative_scan",
+        "nuclei",
+        _burpsuite_alt,
+        {"description": "Burp Suite alternative active scan (nuclei-based)"},
+    ),
     ("zap_scan", "zap", _zap, {"description": "OWASP ZAP baseline/daemon scan"}),
 ]
 
@@ -257,11 +351,19 @@ def register(registry: ToolRegistry = REGISTRY) -> None:
     for name, binary, builder, kw in _SHELL_SPECS:
         kwargs = dict(kw)
         build_input = kwargs.pop("build_input", None)
-        registry.register(ToolSpec(
-            name=name, family="web", executor_kind="shell", binary=binary,
-            build_argv=builder, build_input=build_input, active=True,
-            cacheable=True, **kwargs,
-        ))
+        registry.register(
+            ToolSpec(
+                name=name,
+                family="web",
+                executor_kind="shell",
+                binary=binary,
+                build_argv=builder,
+                build_input=build_input,
+                active=True,
+                cacheable=True,
+                **kwargs,
+            )
+        )
 
 
 register()

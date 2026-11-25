@@ -101,15 +101,17 @@ class ToolRegistry:
     def _dispatch(self, spec: ToolSpec, params: dict, ctx: ToolContext) -> ToolResult:
         if spec.executor_kind == "shell":
             if spec.build_argv is None:
-                return ToolResult(tool=spec.name, status="failed",
-                                  error="shell tool has no build_argv")
+                return ToolResult(
+                    tool=spec.name, status="failed", error="shell tool has no build_argv"
+                )
             argv = spec.build_argv(params)
             input_text = spec.build_input(params) if spec.build_input else None
             return ctx.executor.run(spec.name, argv, timeout=spec.timeout, input_text=input_text)
         # python / http / orchestrator
         if spec.run is None:
-            return ToolResult(tool=spec.name, status="failed",
-                              error=f"{spec.executor_kind} tool has no run()")
+            return ToolResult(
+                tool=spec.name, status="failed", error=f"{spec.executor_kind} tool has no run()"
+            )
         return spec.run(params, ctx)
 
 

@@ -113,9 +113,14 @@ def _checkov(p: dict) -> list[str]:
 
 
 def _terrascan(p: dict) -> list[str]:
-    argv = ["terrascan", "scan",
-            "-t", str(p.get("scan_type", "all")),
-            "-d", str(p.get("iac_dir", "."))]
+    argv = [
+        "terrascan",
+        "scan",
+        "-t",
+        str(p.get("scan_type", "all")),
+        "-d",
+        str(p.get("iac_dir", ".")),
+    ]
     argv += opt("-p", p.get("policy_type"))
     argv += opt("-o", p.get("output_format", "json"))
     argv += opt("--severity", p.get("severity"))
@@ -188,23 +193,107 @@ def _exiftool(p: dict) -> list[str]:
 # (name, family, binary, builder, kwargs)
 _SHELL_SPECS = [
     # --- cloud ---
-    ("prowler_scan", "cloud", "prowler", _prowler, {"description": "Prowler cloud security assessment"}),
-    ("scout_suite_assessment", "cloud", "scout", _scout_suite, {"description": "Scout Suite multi-cloud assessment"}),
-    ("cloudmapper_analysis", "cloud", "cloudmapper", _cloudmapper, {"description": "CloudMapper AWS environment analysis"}),
-    ("kube_hunter_scan", "cloud", "kube-hunter", _kube_hunter, {"description": "kube-hunter Kubernetes scan"}),
-    ("kube_bench_cis", "cloud", "kube-bench", _kube_bench, {"description": "kube-bench CIS Kubernetes benchmark"}),
-    ("docker_bench_security_scan", "cloud", "docker-bench-security", _docker_bench, {"description": "Docker Bench Security assessment"}),
-    ("clair_vulnerability_scan", "cloud", "clairctl", _clair, {"description": "Clair container vulnerability scan"}),
-    ("falco_runtime_monitoring", "cloud", "falco", _falco, {"description": "Falco runtime monitoring"}),
-    ("checkov_iac_scan", "cloud", "checkov", _checkov, {"description": "Checkov IaC static analysis"}),
+    (
+        "prowler_scan",
+        "cloud",
+        "prowler",
+        _prowler,
+        {"description": "Prowler cloud security assessment"},
+    ),
+    (
+        "scout_suite_assessment",
+        "cloud",
+        "scout",
+        _scout_suite,
+        {"description": "Scout Suite multi-cloud assessment"},
+    ),
+    (
+        "cloudmapper_analysis",
+        "cloud",
+        "cloudmapper",
+        _cloudmapper,
+        {"description": "CloudMapper AWS environment analysis"},
+    ),
+    (
+        "kube_hunter_scan",
+        "cloud",
+        "kube-hunter",
+        _kube_hunter,
+        {"description": "kube-hunter Kubernetes scan"},
+    ),
+    (
+        "kube_bench_cis",
+        "cloud",
+        "kube-bench",
+        _kube_bench,
+        {"description": "kube-bench CIS Kubernetes benchmark"},
+    ),
+    (
+        "docker_bench_security_scan",
+        "cloud",
+        "docker-bench-security",
+        _docker_bench,
+        {"description": "Docker Bench Security assessment"},
+    ),
+    (
+        "clair_vulnerability_scan",
+        "cloud",
+        "clairctl",
+        _clair,
+        {"description": "Clair container vulnerability scan"},
+    ),
+    (
+        "falco_runtime_monitoring",
+        "cloud",
+        "falco",
+        _falco,
+        {"description": "Falco runtime monitoring"},
+    ),
+    (
+        "checkov_iac_scan",
+        "cloud",
+        "checkov",
+        _checkov,
+        {"description": "Checkov IaC static analysis"},
+    ),
     ("terrascan_iac_scan", "cloud", "terrascan", _terrascan, {"description": "Terrascan IaC scan"}),
     ("trivy_scan", "cloud", "trivy", _trivy, {"description": "Trivy vulnerability scanner"}),
     # --- forensics ---
-    ("volatility_analyze", "forensics", "volatility", _volatility, {"description": "Volatility 2 memory analysis"}),
-    ("volatility3_analyze", "forensics", "vol", _volatility3, {"description": "Volatility 3 memory analysis"}),
-    ("foremost_carving", "forensics", "foremost", _foremost, {"description": "Foremost file carving"}),
-    ("steghide_analysis", "forensics", "steghide", _steghide, {"description": "Steghide steganography analysis"}),
-    ("exiftool_extract", "forensics", "exiftool", _exiftool, {"description": "ExifTool metadata extraction"}),
+    (
+        "volatility_analyze",
+        "forensics",
+        "volatility",
+        _volatility,
+        {"description": "Volatility 2 memory analysis"},
+    ),
+    (
+        "volatility3_analyze",
+        "forensics",
+        "vol",
+        _volatility3,
+        {"description": "Volatility 3 memory analysis"},
+    ),
+    (
+        "foremost_carving",
+        "forensics",
+        "foremost",
+        _foremost,
+        {"description": "Foremost file carving"},
+    ),
+    (
+        "steghide_analysis",
+        "forensics",
+        "steghide",
+        _steghide,
+        {"description": "Steghide steganography analysis"},
+    ),
+    (
+        "exiftool_extract",
+        "forensics",
+        "exiftool",
+        _exiftool,
+        {"description": "ExifTool metadata extraction"},
+    ),
 ]
 
 
@@ -212,11 +301,19 @@ def register(registry: ToolRegistry = REGISTRY) -> None:
     for name, family, binary, builder, kw in _SHELL_SPECS:
         kwargs = dict(kw)
         build_input = kwargs.pop("build_input", None)
-        registry.register(ToolSpec(
-            name=name, family=family, executor_kind="shell", binary=binary,
-            build_argv=builder, build_input=build_input,
-            active=(family == "cloud"), cacheable=True, **kwargs,
-        ))
+        registry.register(
+            ToolSpec(
+                name=name,
+                family=family,
+                executor_kind="shell",
+                binary=binary,
+                build_argv=builder,
+                build_input=build_input,
+                active=(family == "cloud"),
+                cacheable=True,
+                **kwargs,
+            )
+        )
 
 
 register()

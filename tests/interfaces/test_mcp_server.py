@@ -12,6 +12,7 @@ def _ctx():
 def test_iter_mcp_tools_covers_registry_plus_highlevel():
     load_all()
     from pepperspray.core.registry import REGISTRY
+
     entries = list(ms.iter_mcp_tools(_ctx()))
     names = {name for name, _desc, _fn in entries}
     # every registry tool exposed, plus high-level entrypoints

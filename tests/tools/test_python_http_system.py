@@ -1,7 +1,6 @@
 import types
 
 import httpx
-import pytest
 
 from pepperspray.core.cache import ResultCache
 from pepperspray.core.executor import SafeCommandExecutor
@@ -11,7 +10,9 @@ from pepperspray.tools.specs import http_framework, python_tools, system
 
 def _ctx(tmp_path=None):
     settings = types.SimpleNamespace(results_dir=str(tmp_path)) if tmp_path else None
-    return ToolContext(executor=SafeCommandExecutor(10), cache=ResultCache(10, 100), settings=settings)
+    return ToolContext(
+        executor=SafeCommandExecutor(10), cache=ResultCache(10, 100), settings=settings
+    )
 
 
 def test_jwt_decode_and_alg_none():
@@ -33,7 +34,9 @@ def test_file_ops_sandboxed(tmp_path):
     r = reg.execute("create_file", {"path": "a/b.txt", "content": "hi"}, ctx, authorized=True)
     assert r.status == "success"
     # escape attempt rejected
-    bad = reg.execute("create_file", {"path": "../escape.txt", "content": "x"}, ctx, authorized=True)
+    bad = reg.execute(
+        "create_file", {"path": "../escape.txt", "content": "x"}, ctx, authorized=True
+    )
     assert bad.status == "failed"
 
 
@@ -52,6 +55,7 @@ def test_http_repeater_mocked(monkeypatch):
     def fake_request(method, url, **kw):
         req = httpx.Request(method, url)
         return httpx.Response(200, text="hello", request=req)
+
     monkeypatch.setattr(httpx, "request", fake_request)
     ctx = _ctx()
     out = http_framework._run_repeater({"url": "http://t", "method": "GET"}, ctx)
@@ -60,9 +64,11 @@ def test_http_repeater_mocked(monkeypatch):
 
 def test_http_intruder_iterates(monkeypatch):
     seen = []
+
     def fake_request(method, url, **kw):
         seen.append(url)
         return httpx.Response(200, text="x", request=httpx.Request(method, url))
+
     monkeypatch.setattr(httpx, "request", fake_request)
     out = http_framework._run_intruder({"url": "http://t/FUZZ", "payloads": ["a", "b"]}, _ctx())
     assert out.status == "success"

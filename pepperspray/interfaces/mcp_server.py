@@ -7,7 +7,6 @@ available. Transport is stdio. Authorized testing only.
 
 from __future__ import annotations
 
-import json
 from typing import Any, Callable, Iterator
 
 from pepperspray.core.registry import REGISTRY, ToolContext
@@ -20,13 +19,16 @@ HIGH_LEVEL = ["run_assessment", "run_chain", "list_tools"]
 
 
 def _default_ctx() -> ToolContext:
+    from pepperspray.config import get_settings
     from pepperspray.core.cache import ResultCache
     from pepperspray.core.executor import SafeCommandExecutor
-    from pepperspray.config import get_settings
 
     s = get_settings()
-    return ToolContext(executor=SafeCommandExecutor(s.command_timeout),
-                       cache=ResultCache(s.cache_size, s.cache_ttl), settings=s)
+    return ToolContext(
+        executor=SafeCommandExecutor(s.command_timeout),
+        cache=ResultCache(s.cache_size, s.cache_ttl),
+        settings=s,
+    )
 
 
 def _make_tool_wrapper(name: str, ctx: ToolContext) -> Callable:
@@ -49,16 +51,21 @@ def _make_tool_wrapper(name: str, ctx: ToolContext) -> Callable:
 def iter_mcp_tools(ctx: ToolContext) -> Iterator[tuple[str, str, Callable]]:
     """Yield (name, description, callable) for every MCP tool."""
 
-    def run_assessment_tool(target: str, objective: str = "comprehensive",
-                            authorized: bool = False) -> dict:
+    def run_assessment_tool(
+        target: str, objective: str = "comprehensive", authorized: bool = False
+    ) -> dict:
         """Run the full multi-agent assessment graph against a target."""
         from pepperspray.graph.build import run_assessment
         from pepperspray.llm.provider import get_llm
 
-        final = run_assessment(target=target, objective=objective,
-                               authorized=authorized, ctx=ctx, llm=get_llm())
-        return {"report": final.get("report"), "findings": final.get("findings", []),
-                "completed_steps": final.get("completed_steps", [])}
+        final = run_assessment(
+            target=target, objective=objective, authorized=authorized, ctx=ctx, llm=get_llm()
+        )
+        return {
+            "report": final.get("report"),
+            "findings": final.get("findings", []),
+            "completed_steps": final.get("completed_steps", []),
+        }
 
     def run_chain_tool(name: str, target: str, authorized: bool = False) -> dict:
         """Run a named fixed workflow (chain) against a target."""
@@ -71,8 +78,17 @@ def iter_mcp_tools(ctx: ToolContext) -> Iterator[tuple[str, str, Callable]]:
     def list_tools_tool(family: str = "") -> dict:
         """List available tools, optionally filtered by family."""
         specs = REGISTRY.by_family(family) if family else REGISTRY.all()
-        return {"tools": [{"name": s.name, "family": s.family, "active": s.active,
-                           "description": s.description} for s in specs]}
+        return {
+            "tools": [
+                {
+                    "name": s.name,
+                    "family": s.family,
+                    "active": s.active,
+                    "description": s.description,
+                }
+                for s in specs
+            ]
+        }
 
     yield "run_assessment", run_assessment_tool.__doc__, run_assessment_tool
     yield "run_chain", run_chain_tool.__doc__, run_chain_tool

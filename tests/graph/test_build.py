@@ -1,4 +1,4 @@
-from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from langchain_core.messages import AIMessage, ToolMessage
 
 from pepperspray.agents.supervisor import Route
 from pepperspray.core.cache import ResultCache
@@ -33,7 +33,10 @@ class _FakeAgent:
             t = self.tools[0]
             out = t.invoke({"target": "example.com", "extra": ""})
             msgs += [
-                AIMessage(content="", tool_calls=[{"name": t.name, "args": {"target": "example.com"}, "id": "1"}]),
+                AIMessage(
+                    content="",
+                    tool_calls=[{"name": t.name, "args": {"target": "example.com"}, "id": "1"}],
+                ),
                 ToolMessage(content=out, tool_call_id="1", name=t.name),
             ]
         msgs.append(AIMessage(content="done"))
@@ -49,9 +52,15 @@ def test_graph_compiles_with_expected_nodes():
 
 def test_end_to_end_stub_produces_report():
     load_all()
-    final = run_assessment("example.com", objective="recon", authorized=True,
-                           ctx=_ctx(), router=_SeqRouter(), agent_factory=_FakeAgent,
-                           interrupt_exploitation=False)
+    final = run_assessment(
+        "example.com",
+        objective="recon",
+        authorized=True,
+        ctx=_ctx(),
+        router=_SeqRouter(),
+        agent_factory=_FakeAgent,
+        interrupt_exploitation=False,
+    )
     assert final.get("report")
     assert "example.com" in final["report"]
     assert any(s == "recon" for s in final.get("completed_steps", []))
@@ -60,14 +69,18 @@ def test_end_to_end_stub_produces_report():
 def test_recon_chain_runs():
     load_all()
     from pepperspray.graph.chains import run_chain
-    final = run_chain("recon_chain", "example.com", authorized=True,
-                      ctx=_ctx(), agent_factory=_FakeAgent)
+
+    final = run_chain(
+        "recon_chain", "example.com", authorized=True, ctx=_ctx(), agent_factory=_FakeAgent
+    )
     assert final.get("report") and "example.com" in final["report"]
     assert "recon" in final.get("completed_steps", [])
 
 
 def test_unknown_chain_raises():
-    from pepperspray.graph.chains import build_chain
     import pytest
+
+    from pepperspray.graph.chains import build_chain
+
     with pytest.raises(KeyError):
         build_chain("nope", _ctx())

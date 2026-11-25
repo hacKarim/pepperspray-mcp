@@ -44,8 +44,7 @@ def test_all_binary_passive_and_cacheable(reg):
 def test_every_builder_injection_safe(reg):
     # A hostile param must stay a single argv element, never split into tokens.
     hostile = "x; id && whoami"
-    keys = ["target", "url", "binary", "file", "options",
-            "file_path", "libc_path"]
+    keys = ["target", "url", "binary", "file", "options", "file_path", "libc_path"]
     for spec in reg.all():
         params = {k: hostile for k in keys}
         argv = spec.build_argv(params)
@@ -64,7 +63,12 @@ def test_sqlmap_argv_shape(reg):
 
 def test_msfvenom_argv_shape(reg):
     argv = reg.get("msfvenom_generate").build_argv(
-        {"payload": "linux/x86/meterpreter/reverse_tcp", "format": "elf", "encoder": "x86/shikata_ga_nai"})
+        {
+            "payload": "linux/x86/meterpreter/reverse_tcp",
+            "format": "elf",
+            "encoder": "x86/shikata_ga_nai",
+        }
+    )
     assert argv[:3] == ["msfvenom", "-p", "linux/x86/meterpreter/reverse_tcp"]
     assert "-f" in argv and "elf" in argv
     assert "-e" in argv and "x86/shikata_ga_nai" in argv
@@ -79,7 +83,8 @@ def test_strings_argv_shape(reg):
 
 def test_metasploit_writes_resource_file(reg):
     argv = reg.get("metasploit_run").build_argv(
-        {"module": "exploit/multi/handler", "options": {"LHOST": "10.0.0.1"}})
+        {"module": "exploit/multi/handler", "options": {"LHOST": "10.0.0.1"}}
+    )
     assert argv[:3] == ["msfconsole", "-q", "-r"]
     with open(argv[3]) as fh:
         content = fh.read()

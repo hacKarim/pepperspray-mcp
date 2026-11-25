@@ -34,8 +34,9 @@ def _require_auth(authorized: bool) -> None:
 def run(
     target: str = typer.Option(..., help="Target host, URL or domain."),
     objective: str = typer.Option("comprehensive", help="Assessment objective."),
-    authorized: bool = typer.Option(False, "--authorized/--no-authorized",
-                                    help="Confirm you are authorized to test the target."),
+    authorized: bool = typer.Option(
+        False, "--authorized/--no-authorized", help="Confirm you are authorized to test the target."
+    ),
     model: str = typer.Option(None, help="Override the LLM model id."),
 ) -> None:
     """Run the full supervisor/specialist assessment graph."""

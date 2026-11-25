@@ -24,9 +24,15 @@ def test_every_builder_injection_safe(reg):
     # command fragments; it stays contained inside a single argv element.
     hostile = "x; id && whoami"
     for spec in reg.by_family("web"):
-        argv = spec.build_argv({"url": hostile, "target": hostile,
-                                "domain": hostile, "data": hostile,
-                                "param": hostile})
+        argv = spec.build_argv(
+            {
+                "url": hostile,
+                "target": hostile,
+                "domain": hostile,
+                "data": hostile,
+                "param": hostile,
+            }
+        )
         assert isinstance(argv, list) and all(isinstance(a, str) for a in argv)
         # no loose shell fragment of the payload leaked as its own token
         assert not any(tok in (";", "&&", "id", "whoami") for tok in argv)
@@ -51,15 +57,15 @@ def test_ffuf_argv_shape(reg):
 
 def test_nuclei_argv_shape(reg):
     argv = reg.get("nuclei_scan").build_argv(
-        {"target": "http://t", "severity": "high", "tags": "cve"})
+        {"target": "http://t", "severity": "high", "tags": "cve"}
+    )
     assert argv[:3] == ["nuclei", "-u", "http://t"]
     assert "-severity" in argv and "high" in argv
     assert "-tags" in argv and "cve" in argv
 
 
 def test_stdin_tools_pipe_value(reg):
-    for name in ("anew_data_processing", "qsreplace_parameter_replacement",
-                 "uro_url_filtering"):
+    for name in ("anew_data_processing", "qsreplace_parameter_replacement", "uro_url_filtering"):
         spec = reg.get(name)
         assert spec.build_input({"text": "http://a\nhttp://b"}) == "http://a\nhttp://b"
         assert spec.build_input({"input": "http://c"}) == "http://c"

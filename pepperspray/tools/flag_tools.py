@@ -60,10 +60,24 @@ def _run_validate(params: dict, ctx: ToolContext) -> ToolResult:
 
 
 def register(registry=REGISTRY) -> None:
-    registry.register(ToolSpec(name="flag_extract", family="binary", executor_kind="python",
-                               run=_run_extract, description="Extract CTF flag candidates from text"))
-    registry.register(ToolSpec(name="flag_validate", family="binary", executor_kind="python",
-                               run=_run_validate, description="Validate a CTF flag's format"))
+    registry.register(
+        ToolSpec(
+            name="flag_extract",
+            family="binary",
+            executor_kind="python",
+            run=_run_extract,
+            description="Extract CTF flag candidates from text",
+        )
+    )
+    registry.register(
+        ToolSpec(
+            name="flag_validate",
+            family="binary",
+            executor_kind="python",
+            run=_run_validate,
+            description="Validate a CTF flag's format",
+        )
+    )
 
 
 register()

@@ -34,11 +34,19 @@ def test_every_builder_injection_safe(reg):
     # and never concatenated into a flag.
     hostile = "x; id && whoami"
     params = {
-        "target": hostile, "file": hostile, "account": hostile, "directory": hostile,
+        "target": hostile,
+        "file": hostile,
+        "account": hostile,
+        "directory": hostile,
         # real per-tool user-value keys, all set hostile for coverage
-        "image": hostile, "memory_file": hostile, "input_file": hostile,
-        "cover_file": hostile, "file_path": hostile, "iac_dir": hostile,
-        "plugin": hostile, "embed_file": hostile,
+        "image": hostile,
+        "memory_file": hostile,
+        "input_file": hostile,
+        "cover_file": hostile,
+        "file_path": hostile,
+        "iac_dir": hostile,
+        "plugin": hostile,
+        "embed_file": hostile,
     }
     for spec in reg.all():
         argv = spec.build_argv(dict(params))
@@ -64,5 +72,6 @@ def test_prowler_argv_shape(reg):
 
 def test_volatility3_argv_shape(reg):
     argv = reg.get("volatility3_analyze").build_argv(
-        {"memory_file": "/cases/mem.raw", "plugin": "windows.pslist"})
+        {"memory_file": "/cases/mem.raw", "plugin": "windows.pslist"}
+    )
     assert argv == ["vol", "-f", "/cases/mem.raw", "windows.pslist"]

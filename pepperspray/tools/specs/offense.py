@@ -36,6 +36,7 @@ def _write_temp(content: str, prefix: str, suffix: str) -> str:
 # Family: exploitation
 # --------------------------------------------------------------------------- #
 
+
 def _sqlmap(p: dict) -> list[str]:
     argv = ["sqlmap", "-u", p.get("url", ""), "--batch"]
     data = p.get("data")
@@ -116,8 +117,7 @@ def _john(p: dict) -> list[str]:
 
 def _hashcat(p: dict) -> list[str]:
     attack_mode = str(p.get("attack_mode", "0"))
-    argv = ["hashcat", "-m", str(p.get("hash_type", "")),
-            "-a", attack_mode, p.get("hash_file", "")]
+    argv = ["hashcat", "-m", str(p.get("hash_type", "")), "-a", attack_mode, p.get("hash_file", "")]
     if attack_mode == "0":
         wordlist = p.get("wordlist", "/usr/share/wordlists/rockyou.txt")
         if wordlist:
@@ -131,11 +131,17 @@ def _hashcat(p: dict) -> list[str]:
 
 
 def _hashpump(p: dict) -> list[str]:
-    argv = ["hashpump",
-            "-s", p.get("signature", ""),
-            "-d", p.get("data", ""),
-            "-k", str(p.get("key_length", "")),
-            "-a", p.get("append_data", "")]
+    argv = [
+        "hashpump",
+        "-s",
+        p.get("signature", ""),
+        "-d",
+        p.get("data", ""),
+        "-k",
+        str(p.get("key_length", "")),
+        "-a",
+        p.get("append_data", ""),
+    ]
     argv += extra(p)
     return argv
 
@@ -143,6 +149,7 @@ def _hashpump(p: dict) -> list[str]:
 # --------------------------------------------------------------------------- #
 # Family: binary (local file analysis)
 # --------------------------------------------------------------------------- #
+
 
 def _gdb(p: dict) -> list[str]:
     argv = ["gdb", p.get("binary", "")]
@@ -189,8 +196,14 @@ def _radare2(p: dict) -> list[str]:
 def _ghidra(p: dict) -> list[str]:
     project_name = p.get("project_name", "pepperspray_analysis")
     project_dir = f"/tmp/ghidra_projects/{project_name}"
-    argv = ["analyzeHeadless", project_dir, project_name,
-            "-import", p.get("binary", ""), "-deleteProject"]
+    argv = [
+        "analyzeHeadless",
+        project_dir,
+        project_name,
+        "-import",
+        p.get("binary", ""),
+        "-deleteProject",
+    ]
     script_file = p.get("script_file")
     if script_file:
         argv += ["-postScript", script_file]
@@ -358,31 +371,127 @@ _FAMILY_FLAGS = {
 # (name, family, binary, builder, kwargs)
 _SHELL_SPECS = [
     # --- exploitation -----------------------------------------------------
-    ("sqlmap_scan", "exploitation", "sqlmap", _sqlmap, {"description": "sqlmap SQL injection scan"}),
-    ("metasploit_run", "exploitation", "msfconsole", _metasploit, {"description": "Metasploit module run (resource file)"}),
-    ("msfvenom_generate", "exploitation", "msfvenom", _msfvenom, {"description": "msfvenom payload generation"}),
-    ("hydra_attack", "exploitation", "hydra", _hydra, {"description": "Hydra online password attack"}),
-    ("pacu_exploitation", "exploitation", "pacu", _pacu, {"description": "Pacu AWS exploitation", "build_input": _pacu_input}),
+    (
+        "sqlmap_scan",
+        "exploitation",
+        "sqlmap",
+        _sqlmap,
+        {"description": "sqlmap SQL injection scan"},
+    ),
+    (
+        "metasploit_run",
+        "exploitation",
+        "msfconsole",
+        _metasploit,
+        {"description": "Metasploit module run (resource file)"},
+    ),
+    (
+        "msfvenom_generate",
+        "exploitation",
+        "msfvenom",
+        _msfvenom,
+        {"description": "msfvenom payload generation"},
+    ),
+    (
+        "hydra_attack",
+        "exploitation",
+        "hydra",
+        _hydra,
+        {"description": "Hydra online password attack"},
+    ),
+    (
+        "pacu_exploitation",
+        "exploitation",
+        "pacu",
+        _pacu,
+        {"description": "Pacu AWS exploitation", "build_input": _pacu_input},
+    ),
     ("john_crack", "exploitation", "john", _john, {"description": "John the Ripper hash cracking"}),
-    ("hashcat_crack", "exploitation", "hashcat", _hashcat, {"description": "Hashcat hash cracking"}),
-    ("hashpump_attack", "exploitation", "hashpump", _hashpump, {"description": "HashPump hash length-extension"}),
+    (
+        "hashcat_crack",
+        "exploitation",
+        "hashcat",
+        _hashcat,
+        {"description": "Hashcat hash cracking"},
+    ),
+    (
+        "hashpump_attack",
+        "exploitation",
+        "hashpump",
+        _hashpump,
+        {"description": "HashPump hash length-extension"},
+    ),
     # --- binary -----------------------------------------------------------
     ("gdb_analyze", "binary", "gdb", _gdb, {"description": "GDB binary analysis (batch)"}),
     ("gdb_peda_debug", "binary", "gdb", _gdb_peda, {"description": "GDB-PEDA debugging"}),
     ("radare2_analyze", "binary", "r2", _radare2, {"description": "Radare2 binary analysis"}),
-    ("ghidra_analysis", "binary", "analyzeHeadless", _ghidra, {"description": "Ghidra headless analysis"}),
-    ("binwalk_analyze", "binary", "binwalk", _binwalk, {"description": "Binwalk firmware analysis"}),
-    ("ropgadget_search", "binary", "ROPgadget", _ropgadget, {"description": "ROPgadget gadget search"}),
+    (
+        "ghidra_analysis",
+        "binary",
+        "analyzeHeadless",
+        _ghidra,
+        {"description": "Ghidra headless analysis"},
+    ),
+    (
+        "binwalk_analyze",
+        "binary",
+        "binwalk",
+        _binwalk,
+        {"description": "Binwalk firmware analysis"},
+    ),
+    (
+        "ropgadget_search",
+        "binary",
+        "ROPgadget",
+        _ropgadget,
+        {"description": "ROPgadget gadget search"},
+    ),
     ("ropper_gadget_search", "binary", "ropper", _ropper, {"description": "ropper gadget search"}),
-    ("checksec_analyze", "binary", "checksec", _checksec, {"description": "checksec binary hardening check"}),
+    (
+        "checksec_analyze",
+        "binary",
+        "checksec",
+        _checksec,
+        {"description": "checksec binary hardening check"},
+    ),
     ("xxd_hexdump", "binary", "xxd", _xxd, {"description": "xxd hex dump"}),
     ("strings_extract", "binary", "strings", _strings, {"description": "strings extraction"}),
     ("objdump_analyze", "binary", "objdump", _objdump, {"description": "objdump disassembly"}),
-    ("pwntools_exploit", "binary", "python3", _pwntools, {"description": "pwntools exploit script"}),
-    ("one_gadget_search", "binary", "one_gadget", _one_gadget, {"description": "one_gadget search"}),
-    ("libc_database_lookup", "binary", "libc-database", _libc_database, {"description": "libc-database lookup"}),
-    ("angr_symbolic_execution", "binary", "python3", _angr, {"description": "angr symbolic execution script"}),
-    ("pwninit_setup", "binary", "pwninit", _pwninit, {"description": "pwninit exploit scaffolding"}),
+    (
+        "pwntools_exploit",
+        "binary",
+        "python3",
+        _pwntools,
+        {"description": "pwntools exploit script"},
+    ),
+    (
+        "one_gadget_search",
+        "binary",
+        "one_gadget",
+        _one_gadget,
+        {"description": "one_gadget search"},
+    ),
+    (
+        "libc_database_lookup",
+        "binary",
+        "libc-database",
+        _libc_database,
+        {"description": "libc-database lookup"},
+    ),
+    (
+        "angr_symbolic_execution",
+        "binary",
+        "python3",
+        _angr,
+        {"description": "angr symbolic execution script"},
+    ),
+    (
+        "pwninit_setup",
+        "binary",
+        "pwninit",
+        _pwninit,
+        {"description": "pwninit exploit scaffolding"},
+    ),
 ]
 
 
@@ -390,11 +499,18 @@ def register(registry: ToolRegistry = REGISTRY) -> None:
     for name, family, binary, builder, kw in _SHELL_SPECS:
         kwargs = dict(kw)
         build_input = kwargs.pop("build_input", None)
-        registry.register(ToolSpec(
-            name=name, family=family, executor_kind="shell", binary=binary,
-            build_argv=builder, build_input=build_input,
-            **_FAMILY_FLAGS[family], **kwargs,
-        ))
+        registry.register(
+            ToolSpec(
+                name=name,
+                family=family,
+                executor_kind="shell",
+                binary=binary,
+                build_argv=builder,
+                build_input=build_input,
+                **_FAMILY_FLAGS[family],
+                **kwargs,
+            )
+        )
 
 
 register()

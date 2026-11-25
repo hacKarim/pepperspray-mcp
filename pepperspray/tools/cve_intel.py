@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
-from typing import Any
 
 import httpx
 
@@ -22,18 +21,33 @@ NVD_URL = "https://services.nvd.nist.gov/rest/json/cves/2.0"
 GITHUB_SEARCH_URL = "https://api.github.com/search/repositories"
 
 _EXPLOIT_KEYWORDS = [
-    "remote code execution", "rce", "buffer overflow", "stack overflow",
-    "heap overflow", "use after free", "double free", "format string",
-    "sql injection", "command injection", "authentication bypass",
-    "privilege escalation", "directory traversal", "path traversal",
-    "deserialization", "xxe", "ssrf", "csrf", "xss",
+    "remote code execution",
+    "rce",
+    "buffer overflow",
+    "stack overflow",
+    "heap overflow",
+    "use after free",
+    "double free",
+    "format string",
+    "sql injection",
+    "command injection",
+    "authentication bypass",
+    "privilege escalation",
+    "directory traversal",
+    "path traversal",
+    "deserialization",
+    "xxe",
+    "ssrf",
+    "csrf",
+    "xss",
 ]
 _EXPLOIT_REF_SOURCES = ["exploit-db.com", "github.com", "packetstormsecurity.com", "metasploit"]
 
 
 def _get_json(url: str, params: dict, timeout: int = 30) -> dict:
-    resp = httpx.get(url, params=params, timeout=timeout,
-                     headers={"User-Agent": "pepperspray-cve-intel"})
+    resp = httpx.get(
+        url, params=params, timeout=timeout, headers={"User-Agent": "pepperspray-cve-intel"}
+    )
     resp.raise_for_status()
     return resp.json()
 
@@ -110,8 +124,7 @@ def analyze_cve_exploitability(cve_id: str) -> dict:
 
     references = cve.get("references", [])
     public_exploits = any(
-        any(src in ref.get("url", "").lower() for src in _EXPLOIT_REF_SOURCES)
-        for ref in references
+        any(src in ref.get("url", "").lower() for src in _EXPLOIT_REF_SOURCES) for ref in references
     )
 
     return {
@@ -141,8 +154,12 @@ def search_existing_exploits(cve_id: str) -> list[dict]:
     try:
         data = _get_json(
             GITHUB_SEARCH_URL,
-            {"q": f"{cve_id} exploit poc vulnerability", "sort": "updated",
-             "order": "desc", "per_page": 10},
+            {
+                "q": f"{cve_id} exploit poc vulnerability",
+                "sort": "updated",
+                "order": "desc",
+                "per_page": 10,
+            },
             timeout=15,
         )
     except httpx.HTTPError:
@@ -161,17 +178,19 @@ def search_existing_exploits(cve_id: str) -> list[dict]:
             reliability = "GOOD"
         elif stars >= 20 or forks >= 5:
             reliability = "FAIR"
-        exploits.append({
-            "source": "github",
-            "title": repo.get("name", ""),
-            "description": repo.get("description", ""),
-            "author": repo.get("owner", {}).get("login", "Unknown"),
-            "url": repo.get("html_url", ""),
-            "stars": stars,
-            "forks": forks,
-            "type": "proof-of-concept",
-            "reliability": reliability,
-        })
+        exploits.append(
+            {
+                "source": "github",
+                "title": repo.get("name", ""),
+                "description": repo.get("description", ""),
+                "author": repo.get("owner", {}).get("login", "Unknown"),
+                "url": repo.get("html_url", ""),
+                "stars": stars,
+                "forks": forks,
+                "type": "proof-of-concept",
+                "reliability": reliability,
+            }
+        )
     return exploits
 
 
@@ -198,45 +217,68 @@ def fetch_latest_cves(hours: int = 24, severity_filter: str = "HIGH,CRITICAL") -
         severity = cvss.get("baseSeverity", "UNKNOWN")
         if wanted and severity not in wanted:
             continue
-        out.append({
-            "cve_id": cve.get("id", ""),
-            "severity": severity,
-            "cvss_score": cvss.get("baseScore", 0.0),
-            "published": cve.get("published", ""),
-        })
+        out.append(
+            {
+                "cve_id": cve.get("id", ""),
+                "severity": severity,
+                "cvss_score": cvss.get("baseScore", 0.0),
+                "published": cve.get("published", ""),
+            }
+        )
     return out
 
 
 # --- registry wiring -------------------------------------------------------
 
+
 def _run_cve_exploitability(params: dict, ctx: ToolContext) -> ToolResult:
     out = analyze_cve_exploitability(params.get("cve_id", ""))
-    return ToolResult(tool="cve_exploitability", status="success" if out.get("success") else "failed",
-                      stdout=json.dumps(out, indent=2), error=out.get("error"))
+    return ToolResult(
+        tool="cve_exploitability",
+        status="success" if out.get("success") else "failed",
+        stdout=json.dumps(out, indent=2),
+        error=out.get("error"),
+    )
 
 
 def _run_cve_search(params: dict, ctx: ToolContext) -> ToolResult:
     out = search_existing_exploits(params.get("cve_id", ""))
-    return ToolResult(tool="cve_exploit_search", status="success",
-                      stdout=json.dumps(out, indent=2))
+    return ToolResult(tool="cve_exploit_search", status="success", stdout=json.dumps(out, indent=2))
 
 
 def _run_cve_monitor(params: dict, ctx: ToolContext) -> ToolResult:
-    out = fetch_latest_cves(int(params.get("hours", 24)),
-                            params.get("severity", "HIGH,CRITICAL"))
+    out = fetch_latest_cves(int(params.get("hours", 24)), params.get("severity", "HIGH,CRITICAL"))
     return ToolResult(tool="cve_monitor", status="success", stdout=json.dumps(out, indent=2))
 
 
 def register(registry=REGISTRY) -> None:
-    registry.register(ToolSpec(name="cve_exploitability", family="cve",
-                               executor_kind="python", run=_run_cve_exploitability,
-                               description="Score a CVE's exploitability from NVD CVSS data"))
-    registry.register(ToolSpec(name="cve_exploit_search", family="cve",
-                               executor_kind="python", run=_run_cve_search,
-                               description="Search GitHub for public exploits/PoCs for a CVE"))
-    registry.register(ToolSpec(name="cve_monitor", family="cve",
-                               executor_kind="python", run=_run_cve_monitor,
-                               description="List recently modified CVEs from NVD by severity"))
+    registry.register(
+        ToolSpec(
+            name="cve_exploitability",
+            family="cve",
+            executor_kind="python",
+            run=_run_cve_exploitability,
+            description="Score a CVE's exploitability from NVD CVSS data",
+        )
+    )
+    registry.register(
+        ToolSpec(
+            name="cve_exploit_search",
+            family="cve",
+            executor_kind="python",
+            run=_run_cve_search,
+            description="Search GitHub for public exploits/PoCs for a CVE",
+        )
+    )
+    registry.register(
+        ToolSpec(
+            name="cve_monitor",
+            family="cve",
+            executor_kind="python",
+            run=_run_cve_monitor,
+            description="List recently modified CVEs from NVD by severity",
+        )
+    )
 
 
 register()

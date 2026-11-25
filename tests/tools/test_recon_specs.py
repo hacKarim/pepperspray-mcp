@@ -19,8 +19,15 @@ def test_every_builder_injection_safe(reg):
     # A hostile param must stay a single argv element, never split into tokens.
     hostile = "x; id && whoami"
     for spec in reg.by_family("recon"):
-        argv = spec.build_argv({"target": hostile, "domain": hostile, "url": hostile,
-                                "user": hostile, "interface": "eth0"})
+        argv = spec.build_argv(
+            {
+                "target": hostile,
+                "domain": hostile,
+                "url": hostile,
+                "user": hostile,
+                "interface": "eth0",
+            }
+        )
         assert isinstance(argv, list) and all(isinstance(a, str) for a in argv)
         # the hostile value, when present, is exactly one element (not shell-split)
         assert "; id" not in " ".join(a for a in argv if a != hostile) or hostile in argv

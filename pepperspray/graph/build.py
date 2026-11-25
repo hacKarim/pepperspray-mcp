@@ -80,9 +80,15 @@ def run_assessment(
 
         ctx = ToolContext(executor=SafeCommandExecutor(300), cache=ResultCache())
 
-    graph = build_graph(ctx, llm=llm, registry=registry, agent_factory=agent_factory,
-                        router=router, checkpointer=checkpointer,
-                        interrupt_exploitation=interrupt_exploitation)
+    graph = build_graph(
+        ctx,
+        llm=llm,
+        registry=registry,
+        agent_factory=agent_factory,
+        router=router,
+        checkpointer=checkpointer,
+        interrupt_exploitation=interrupt_exploitation,
+    )
     state = new_state(target=target, objective=objective, authorized=authorized)
     config = {"configurable": {"thread_id": thread_id}, "recursion_limit": recursion_limit}
     return graph.invoke(state, config=config)

@@ -15,22 +15,36 @@ class _StubRouter:
 
 
 def test_supervisor_clamps_unknown_next():
-    out = supervisor_node({"objective": "o", "findings": [], "step_budget": 5,
-                           "completed_steps": []}, router=_StubRouter("bogus_agent"))
-    assert out["next"] in {"FINISH", "recon", "web", "exploitation", "binary",
-                           "cloud", "forensics", "cve"}
+    out = supervisor_node(
+        {"objective": "o", "findings": [], "step_budget": 5, "completed_steps": []},
+        router=_StubRouter("bogus_agent"),
+    )
+    assert out["next"] in {
+        "FINISH",
+        "recon",
+        "web",
+        "exploitation",
+        "binary",
+        "cloud",
+        "forensics",
+        "cve",
+    }
     assert out["next"] == "FINISH"  # unknown -> FINISH
 
 
 def test_step_budget_forces_finish():
-    out = supervisor_node({"objective": "o", "findings": [], "step_budget": 0,
-                           "completed_steps": []}, router=_StubRouter("recon"))
+    out = supervisor_node(
+        {"objective": "o", "findings": [], "step_budget": 0, "completed_steps": []},
+        router=_StubRouter("recon"),
+    )
     assert out["next"] == "FINISH"
 
 
 def test_supervisor_decrements_budget():
-    out = supervisor_node({"objective": "o", "findings": [], "step_budget": 3,
-                           "completed_steps": []}, router=_StubRouter("recon"))
+    out = supervisor_node(
+        {"objective": "o", "findings": [], "step_budget": 3, "completed_steps": []},
+        router=_StubRouter("recon"),
+    )
     assert out["next"] == "recon"
     assert out["step_budget"] == 2
 

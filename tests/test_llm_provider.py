@@ -10,6 +10,7 @@ def _settings(**kw):
         anthropic_api_key = kw.get("anthropic_api_key", None)
         openai_api_key = kw.get("openai_api_key", None)
         ollama_base_url = "http://localhost:11434"
+
     return S()
 
 

@@ -20,7 +20,10 @@ class ToolExecutionError(Exception):
 
 
 _PATTERNS: list[tuple[str, str]] = [
-    (r"command not found|no such file or directory|executable not found|not found", "tool_not_found"),
+    (
+        r"command not found|no such file or directory|executable not found|not found",
+        "tool_not_found",
+    ),
     (r"permission denied|access denied|not permitted", "permission_denied"),
     (r"timed out|timeout|connection timed out", "timeout"),
     (r"connection refused|could not connect|network unreachable|no route to host", "network_error"),

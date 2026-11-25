@@ -1,7 +1,8 @@
 import operator
 
-from pepperspray.core.state import AssessmentState, new_state
 from langgraph.graph.message import add_messages  # noqa: F401 ensure dep
+
+from pepperspray.core.state import AssessmentState, new_state
 
 
 def test_new_state_defaults():

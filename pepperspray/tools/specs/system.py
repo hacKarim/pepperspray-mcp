@@ -13,23 +13,31 @@ from pepperspray.core.registry import REGISTRY, ToolContext, ToolRegistry, ToolS
 
 
 def _ok(name: str, payload) -> ToolResult:
-    return ToolResult(tool=name, status="success", stdout=json.dumps(payload, indent=2, default=str))
+    return ToolResult(
+        tool=name, status="success", stdout=json.dumps(payload, indent=2, default=str)
+    )
 
 
 def _run_health(params: dict, ctx: ToolContext) -> ToolResult:
-    return _ok("server_health", {
-        "status": "healthy",
-        "tool_count": len(REGISTRY.all()),
-        "families": REGISTRY.families(),
-    })
+    return _ok(
+        "server_health",
+        {
+            "status": "healthy",
+            "tool_count": len(REGISTRY.all()),
+            "families": REGISTRY.families(),
+        },
+    )
 
 
 def _run_cache_stats(params: dict, ctx: ToolContext) -> ToolResult:
     cache = ctx.cache
-    return _ok("get_cache_stats", {
-        "size": len(getattr(cache, "_cache", {})),
-        "maxsize": getattr(getattr(cache, "_cache", None), "maxsize", None),
-    })
+    return _ok(
+        "get_cache_stats",
+        {
+            "size": len(getattr(cache, "_cache", {})),
+            "maxsize": getattr(getattr(cache, "_cache", None), "maxsize", None),
+        },
+    )
 
 
 def _run_clear_cache(params: dict, ctx: ToolContext) -> ToolResult:
@@ -40,11 +48,14 @@ def _run_clear_cache(params: dict, ctx: ToolContext) -> ToolResult:
 
 
 def _run_telemetry(params: dict, ctx: ToolContext) -> ToolResult:
-    return _ok("get_telemetry", {
-        "cpu_percent": psutil.cpu_percent(interval=0.0),
-        "memory_percent": psutil.virtual_memory().percent,
-        "tool_count": len(REGISTRY.all()),
-    })
+    return _ok(
+        "get_telemetry",
+        {
+            "cpu_percent": psutil.cpu_percent(interval=0.0),
+            "memory_percent": psutil.virtual_memory().percent,
+            "tool_count": len(REGISTRY.all()),
+        },
+    )
 
 
 def _run_list_processes(params: dict, ctx: ToolContext) -> ToolResult:
@@ -68,11 +79,14 @@ def _run_process_status(params: dict, ctx: ToolContext) -> ToolResult:
 
 
 def _run_dashboard(params: dict, ctx: ToolContext) -> ToolResult:
-    return _ok("get_process_dashboard", {
-        "cpu_percent": psutil.cpu_percent(interval=0.0),
-        "memory_percent": psutil.virtual_memory().percent,
-        "process_count": len(psutil.pids()),
-    })
+    return _ok(
+        "get_process_dashboard",
+        {
+            "cpu_percent": psutil.cpu_percent(interval=0.0),
+            "memory_percent": psutil.virtual_memory().percent,
+            "process_count": len(psutil.pids()),
+        },
+    )
 
 
 _SYS_SPECS = [
@@ -88,8 +102,9 @@ _SYS_SPECS = [
 
 def register(registry: ToolRegistry = REGISTRY) -> None:
     for name, fn, desc in _SYS_SPECS:
-        registry.register(ToolSpec(name=name, family="system", executor_kind="python",
-                                   run=fn, description=desc))
+        registry.register(
+            ToolSpec(name=name, family="system", executor_kind="python", run=fn, description=desc)
+        )
 
 
 register()

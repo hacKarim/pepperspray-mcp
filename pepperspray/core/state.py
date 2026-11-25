@@ -27,8 +27,12 @@ class AssessmentState(TypedDict, total=False):
     report: str | None
 
 
-def new_state(target: str, objective: str = "comprehensive",
-              authorized: bool = False, step_budget: int | None = None) -> AssessmentState:
+def new_state(
+    target: str,
+    objective: str = "comprehensive",
+    authorized: bool = False,
+    step_budget: int | None = None,
+) -> AssessmentState:
     budget = step_budget if step_budget is not None else get_settings().step_budget
     return AssessmentState(
         target=target,
@@ -45,6 +49,7 @@ def new_state(target: str, objective: str = "comprehensive",
     )
 
 
-def record_finding(title: str, severity: str = "info", detail: str = "",
-                   source: str = "") -> dict[str, Any]:
+def record_finding(
+    title: str, severity: str = "info", detail: str = "", source: str = ""
+) -> dict[str, Any]:
     return {"title": title, "severity": severity, "detail": detail, "source": source}

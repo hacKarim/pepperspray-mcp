@@ -17,13 +17,19 @@ _STATE: dict = {"scope": [], "rules": []}
 
 
 def _ok(name: str, payload) -> ToolResult:
-    return ToolResult(tool=name, status="success", stdout=json.dumps(payload, indent=2, default=str))
+    return ToolResult(
+        tool=name, status="success", stdout=json.dumps(payload, indent=2, default=str)
+    )
 
 
 def _send(method: str, url: str, **kw) -> dict:
     resp = httpx.request(method, url, timeout=kw.pop("timeout", 30), follow_redirects=True, **kw)
-    return {"status_code": resp.status_code, "headers": dict(resp.headers),
-            "length": len(resp.content), "body": resp.text[:4000]}
+    return {
+        "status_code": resp.status_code,
+        "headers": dict(resp.headers),
+        "length": len(resp.content),
+        "body": resp.text[:4000],
+    }
 
 
 def _run_repeater(params: dict, ctx: ToolContext) -> ToolResult:
@@ -31,9 +37,12 @@ def _run_repeater(params: dict, ctx: ToolContext) -> ToolResult:
     if not url:
         return ToolResult(tool="http_repeater", status="failed", error="url required")
     try:
-        out = _send(params.get("method", "GET"), url,
-                    headers=params.get("headers") or {},
-                    data=params.get("data") or None)
+        out = _send(
+            params.get("method", "GET"),
+            url,
+            headers=params.get("headers") or {},
+            data=params.get("data") or None,
+        )
     except httpx.HTTPError as exc:
         return ToolResult(tool="http_repeater", status="failed", error=str(exc))
     return _ok("http_repeater", out)
@@ -83,8 +92,14 @@ def _run_api_fuzzer(params: dict, ctx: ToolContext) -> ToolResult:
             url = f"{base}/{str(ep).lstrip('/')}"
             try:
                 r = _send(method, url)
-                results.append({"endpoint": ep, "method": method,
-                                "status_code": r["status_code"], "length": r["length"]})
+                results.append(
+                    {
+                        "endpoint": ep,
+                        "method": method,
+                        "status_code": r["status_code"],
+                        "length": r["length"],
+                    }
+                )
             except httpx.HTTPError as exc:
                 results.append({"endpoint": ep, "method": method, "error": str(exc)})
     return _ok("api_fuzzer", {"results": results})
@@ -102,8 +117,10 @@ def _run_graphql_scanner(params: dict, ctx: ToolContext) -> ToolResult:
         introspection_enabled = resp.status_code == 200 and "__schema" in resp.text
     except httpx.HTTPError as exc:
         return ToolResult(tool="graphql_scanner", status="failed", error=str(exc))
-    return _ok("graphql_scanner", {"introspection_enabled": introspection_enabled,
-                                   "status_code": resp.status_code})
+    return _ok(
+        "graphql_scanner",
+        {"introspection_enabled": introspection_enabled, "status_code": resp.status_code},
+    )
 
 
 def _run_schema_analyzer(params: dict, ctx: ToolContext) -> ToolResult:
@@ -112,27 +129,50 @@ def _run_schema_analyzer(params: dict, ctx: ToolContext) -> ToolResult:
         try:
             schema = json.loads(schema)
         except json.JSONDecodeError:
-            return ToolResult(tool="api_schema_analyzer", status="failed", error="invalid schema json")
+            return ToolResult(
+                tool="api_schema_analyzer", status="failed", error="invalid schema json"
+            )
     paths = list((schema.get("paths") or {}).keys())
     return _ok("api_schema_analyzer", {"path_count": len(paths), "paths": paths[:50]})
 
 
 _HTTP_SPECS = [
-    ("http_repeater", _run_repeater, {"active": True, "description": "Send a single crafted HTTP request"}),
-    ("http_intruder", _run_intruder, {"active": True, "description": "Fuzz a FUZZ marker with payloads"}),
-    ("http_framework_test", _run_framework_test, {"active": True, "description": "HTTP framework dispatcher"}),
+    (
+        "http_repeater",
+        _run_repeater,
+        {"active": True, "description": "Send a single crafted HTTP request"},
+    ),
+    (
+        "http_intruder",
+        _run_intruder,
+        {"active": True, "description": "Fuzz a FUZZ marker with payloads"},
+    ),
+    (
+        "http_framework_test",
+        _run_framework_test,
+        {"active": True, "description": "HTTP framework dispatcher"},
+    ),
     ("http_set_scope", _run_set_scope, {"description": "Set the testing scope"}),
     ("http_set_rules", _run_set_rules, {"description": "Set match/replace rules"}),
     ("api_fuzzer", _run_api_fuzzer, {"active": True, "description": "Probe API endpoints"}),
-    ("graphql_scanner", _run_graphql_scanner, {"active": True, "description": "Check GraphQL introspection"}),
-    ("api_schema_analyzer", _run_schema_analyzer, {"description": "Analyze an OpenAPI/GraphQL schema"}),
+    (
+        "graphql_scanner",
+        _run_graphql_scanner,
+        {"active": True, "description": "Check GraphQL introspection"},
+    ),
+    (
+        "api_schema_analyzer",
+        _run_schema_analyzer,
+        {"description": "Analyze an OpenAPI/GraphQL schema"},
+    ),
 ]
 
 
 def register(registry: ToolRegistry = REGISTRY) -> None:
     for name, fn, kw in _HTTP_SPECS:
-        registry.register(ToolSpec(name=name, family="web_http", executor_kind="http",
-                                   run=fn, **kw))
+        registry.register(
+            ToolSpec(name=name, family="web_http", executor_kind="http", run=fn, **kw)
+        )
 
 
 register()
