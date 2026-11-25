@@ -20,14 +20,12 @@ from pepperspray.core.messages import AGENTS
 from pepperspray.core.registry import REGISTRY, ToolContext, ToolRegistry
 from pepperspray.core.state import AssessmentState, new_state
 from pepperspray.graph.persistence import get_checkpointer
-from pepperspray.graph.routing import (
-    exploitation_gate,
-    route_exploitation_gate,
-    route_from_supervisor,
-)
+from pepperspray.graph.resilience import DEFAULT_RETRY, specialist_cache_policy
+from pepperspray.graph.routing import exploitation_gate, route_from_supervisor
 from pepperspray.reporting.report import render_report
 
 _EXPLOIT_GATE = "exploitation_gate"
+_EXPLOIT = "exploitation"
 
 _SPECIALISTS = [a for a in AGENTS if a != "reporting"]
 
@@ -44,6 +42,9 @@ def build_graph(
     scorer: Callable | None = None,
     verifier: Callable | None = None,
     use_subgraphs: bool = True,
+    retry_policy: Any = DEFAULT_RETRY,
+    node_cache: bool = True,
+    cache_ttl: int | None = None,
 ):
     """Build and compile the assessment StateGraph.
 
@@ -53,10 +54,21 @@ def build_graph(
     When ``reflect`` is set, the supervisor's FINISH routes into a critic →
     (verify → critic)* reflection loop before reporting, so findings are deduped,
     scored and optionally re-verified. Otherwise it goes straight to reporting.
+
+    Nodes that do I/O carry a ``retry_policy`` (transient-failure retry with
+    backoff); specialist nodes also carry a per-run cache so re-dispatching the
+    same specialist on the same target is served from cache (``node_cache``).
     """
+    from pepperspray.config import get_settings
+
+    ttl = cache_ttl if cache_ttl is not None else get_settings().cache_ttl
     graph = StateGraph(AssessmentState)
 
-    graph.add_node("supervisor", lambda state: supervisor_node(state, llm=llm, router=router))
+    graph.add_node(
+        "supervisor",
+        lambda state: supervisor_node(state, llm=llm, router=router),
+        retry_policy=retry_policy,
+    )
 
     if use_subgraphs:
         from pepperspray.agents.subgraph import build_specialist_subgraphs
@@ -69,7 +81,12 @@ def build_graph(
             ctx, llm=llm, registry=registry, agent_factory=agent_factory
         )
     for name, node in specialists.items():
-        graph.add_node(name, node)
+        graph.add_node(
+            name,
+            node,
+            retry_policy=retry_policy,
+            cache_policy=specialist_cache_policy(name, ttl) if node_cache else None,
+        )
 
     graph.add_node("reporting", lambda state: {"report": render_report(state)})
 
@@ -79,15 +96,12 @@ def build_graph(
     # reflection loop first when enabled.
     path_map["reporting"] = "critic" if reflect else "reporting"
     # Exploitation is gated behind a dynamic human-in-the-loop interrupt: route
-    # the supervisor's exploitation pick through the gate node instead.
+    # the supervisor's exploitation pick through the gate node, which then
+    # self-routes to exploitation (approve) or back to supervisor (deny) via
+    # Command(goto=...). ``destinations`` records those edges for the graph.
     if interrupt_exploitation:
         path_map["exploitation"] = _EXPLOIT_GATE
-        graph.add_node(_EXPLOIT_GATE, exploitation_gate)
-        graph.add_conditional_edges(
-            _EXPLOIT_GATE,
-            route_exploitation_gate,
-            {"exploitation": "exploitation", "supervisor": "supervisor"},
-        )
+        graph.add_node(_EXPLOIT_GATE, exploitation_gate, destinations=(_EXPLOIT, "supervisor"))
     graph.add_conditional_edges("supervisor", route_from_supervisor, path_map)
     for name in _SPECIALISTS:
         graph.add_edge(name, "supervisor")
@@ -97,8 +111,16 @@ def build_graph(
             from pepperspray.agents.critic import make_rerun_verifier
 
             verifier = make_rerun_verifier(registry)
-        graph.add_node("critic", lambda s: critic_node(s, scorer=scorer, llm=llm))
-        graph.add_node("verify", lambda s: verify_node(s, verifier=verifier, ctx=ctx))
+        graph.add_node(
+            "critic",
+            lambda s: critic_node(s, scorer=scorer, llm=llm),
+            retry_policy=retry_policy,
+        )
+        graph.add_node(
+            "verify",
+            lambda s: verify_node(s, verifier=verifier, ctx=ctx),
+            retry_policy=retry_policy,
+        )
         graph.add_conditional_edges(
             "critic", route_reflection, {"verify": "verify", "reporting": "reporting"}
         )
@@ -107,10 +129,14 @@ def build_graph(
     graph.add_edge("reporting", END)
 
     if checkpointer is None:
-        from pepperspray.config import get_settings
-
         checkpointer = get_checkpointer(get_settings().checkpoint_db)
-    return graph.compile(checkpointer=checkpointer)
+
+    cache = None
+    if node_cache:
+        from langgraph.cache.memory import InMemoryCache
+
+        cache = InMemoryCache()
+    return graph.compile(checkpointer=checkpointer, cache=cache)
 
 
 def run_assessment(
@@ -130,6 +156,7 @@ def run_assessment(
     verify_budget: int = 1,
     thread_id: str = "assessment",
     recursion_limit: int = 50,
+    retry_policy: Any = DEFAULT_RETRY,
 ) -> dict:
     """Run a full assessment and return the final state (incl. the report)."""
     graph, state, config = _assessment_graph(
@@ -149,6 +176,7 @@ def run_assessment(
         verify_budget,
         thread_id,
         recursion_limit,
+        retry_policy,
     )
     result = graph.invoke(state, config=config)
     return _finalize(graph, config, result)
@@ -171,6 +199,7 @@ def _assessment_graph(
     verify_budget,
     thread_id,
     recursion_limit,
+    retry_policy=DEFAULT_RETRY,
 ):
     """Shared setup for both the blocking and streaming entry points."""
     if ctx is None:
@@ -190,6 +219,7 @@ def _assessment_graph(
         reflect=reflect,
         scorer=scorer,
         verifier=verifier,
+        retry_policy=retry_policy,
     )
     state = new_state(
         target=target, objective=objective, authorized=authorized, verify_budget=verify_budget
@@ -305,6 +335,7 @@ def stream_assessment(
     verify_budget: int = 1,
     thread_id: str = "assessment",
     recursion_limit: int = 50,
+    retry_policy: Any = DEFAULT_RETRY,
 ) -> Iterator[dict]:
     """Stream a full assessment, yielding a typed event per superstep."""
     graph, state, config = _assessment_graph(
@@ -324,6 +355,7 @@ def stream_assessment(
         verify_budget,
         thread_id,
         recursion_limit,
+        retry_policy,
     )
     yield from _stream_events(graph, state, config)
 

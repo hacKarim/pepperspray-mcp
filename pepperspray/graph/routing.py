@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from langgraph.types import interrupt
+from langgraph.types import Command, interrupt
 
 from pepperspray.core.messages import AGENTS
 
@@ -59,17 +59,17 @@ def _parse_decision(decision: Any) -> tuple[str, dict]:
     return ("approve" if approve else "deny"), edits
 
 
-def exploitation_gate(state: dict) -> dict:
-    """Dynamic HITL gate before exploitation.
+def exploitation_gate(state: dict) -> Command:
+    """Dynamic HITL gate before exploitation; self-routes via ``Command(goto=)``.
 
     Pauses the graph with an approval-request payload and resumes on the
-    operator's decision: approve (optionally with state edits), or deny — which
-    records a finding and routes back to the supervisor instead of exploiting.
-    An approval holds for the rest of the run so the operator is not re-prompted
-    every exploitation hop.
+    operator's decision: approve (optionally with state edits) routes to the
+    exploitation specialist; deny records a finding and routes back to the
+    supervisor instead of exploiting. An approval holds for the rest of the run
+    so the operator is not re-prompted every exploitation hop.
     """
     if state.get("exploitation_approved"):
-        return {"next": EXPLOITATION_AGENT}
+        return Command(goto=EXPLOITATION_AGENT)
 
     decision = interrupt(
         {
@@ -82,24 +82,15 @@ def exploitation_gate(state: dict) -> dict:
     )
     verdict, edits = _parse_decision(decision)
     if verdict == "approve":
-        updates: dict = {"next": EXPLOITATION_AGENT, "exploitation_approved": True}
-        updates.update(edits)
-        return updates
+        update: dict = {"exploitation_approved": True}
+        update.update(edits)
+        return Command(goto=EXPLOITATION_AGENT, update=update)
 
-    return {
-        "next": "supervisor",
-        "findings": [
-            {
-                "title": f"exploitation step denied by operator on {state.get('target', '')}".strip(),
-                "severity": "info",
-                "source": "hitl",
-                "detail": f"decision={decision!r}"[:160],
-                "_status": "denied",
-            }
-        ],
+    denial = {
+        "title": f"exploitation step denied by operator on {state.get('target', '')}".strip(),
+        "severity": "info",
+        "source": "hitl",
+        "detail": f"decision={decision!r}"[:160],
+        "_status": "denied",
     }
-
-
-def route_exploitation_gate(state: dict) -> str:
-    """After the gate: proceed to exploitation on approval, else to supervisor."""
-    return EXPLOITATION_AGENT if state.get("next") == EXPLOITATION_AGENT else "supervisor"
+    return Command(goto="supervisor", update={"findings": [denial]})
