@@ -34,6 +34,9 @@ class AssessmentState(TypedDict, total=False):
     # the critic flagged for a verification pass.
     curated_findings: list[dict]
     to_verify: list[dict]
+    # Specialist subgraph scratch (overwrite): findings awaiting the subgraph's
+    # local verify step before they enter the shared findings list.
+    pending_findings: list[dict]
 
 
 def new_state(

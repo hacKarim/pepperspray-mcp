@@ -37,8 +37,12 @@ def build_graph(
     reflect: bool = True,
     scorer: Callable | None = None,
     verifier: Callable | None = None,
+    use_subgraphs: bool = True,
 ):
     """Build and compile the assessment StateGraph.
+
+    Each specialist is a nested plan→act→verify subgraph by default
+    (``use_subgraphs``); set it False for the flat single-node specialists.
 
     When ``reflect`` is set, the supervisor's FINISH routes into a critic →
     (verify → critic)* reflection loop before reporting, so findings are deduped,
@@ -48,7 +52,16 @@ def build_graph(
 
     graph.add_node("supervisor", lambda state: supervisor_node(state, llm=llm, router=router))
 
-    specialists = build_specialists(ctx, llm=llm, registry=registry, agent_factory=agent_factory)
+    if use_subgraphs:
+        from pepperspray.agents.subgraph import build_specialist_subgraphs
+
+        specialists = build_specialist_subgraphs(
+            ctx, llm=llm, registry=registry, agent_factory=agent_factory
+        )
+    else:
+        specialists = build_specialists(
+            ctx, llm=llm, registry=registry, agent_factory=agent_factory
+        )
     for name, node in specialists.items():
         graph.add_node(name, node)
 

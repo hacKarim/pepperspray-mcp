@@ -51,36 +51,60 @@ def make_specialist(
     llm: Any = None,
     agent_factory: Callable | None = None,
 ) -> Callable[[dict], dict]:
-    """Return a LangGraph node function for a specialist agent."""
+    """Return a LangGraph node function for a flat specialist agent."""
 
     def node(state: dict) -> dict:
-        authorized = bool(state.get("authorized", False))
-        specs = [s for fam in families for s in registry.by_family(fam)]
-        lc_tools = [_make_lc_tool(s, ctx, registry, authorized) for s in specs]
-
-        factory = agent_factory or _default_factory
-        agent = factory(llm, lc_tools)
-
-        task = (
-            f"{system_prompt}\n\nTarget: {state.get('target', '')}\n"
-            f"Objective: {state.get('objective', '')}\n"
-            f"Authorized: {authorized}. Use your tools, then summarize findings."
+        updates, findings = run_specialist_act(
+            name, families, system_prompt, state, ctx, registry, llm, agent_factory
         )
-        prior = list(state.get("messages", []))
-        result = agent.invoke({"messages": prior + [HumanMessage(task)]})
-        messages = result.get("messages", [])
-
-        tool_results = _harvest_tool_results(messages)
-        findings = _findings_from_results(tool_results, agent=name, target=state.get("target", ""))
-        return {
-            "messages": messages,
-            "tool_results": tool_results,
-            "findings": findings,
-            "completed_steps": [name],
-            "next": "supervisor",
-        }
+        updates["findings"] = findings
+        updates["next"] = "supervisor"
+        return updates
 
     return node
+
+
+def run_specialist_act(
+    name: str,
+    families: list[str],
+    system_prompt: str,
+    state: dict,
+    ctx: ToolContext,
+    registry: ToolRegistry = REGISTRY,
+    llm: Any = None,
+    agent_factory: Callable | None = None,
+) -> tuple[dict, list[dict]]:
+    """Run the specialist's ReAct agent once.
+
+    Returns ``(updates, findings)`` where ``updates`` carries messages,
+    tool_results and completed_steps, and ``findings`` is the list the caller
+    decides where to put (directly on the flat node, or via the subgraph's
+    verify step). Keeps the act logic in one place for both call sites.
+    """
+    authorized = bool(state.get("authorized", False))
+    specs = [s for fam in families for s in registry.by_family(fam)]
+    lc_tools = [_make_lc_tool(s, ctx, registry, authorized) for s in specs]
+
+    factory = agent_factory or _default_factory
+    agent = factory(llm, lc_tools)
+
+    task = (
+        f"{system_prompt}\n\nTarget: {state.get('target', '')}\n"
+        f"Objective: {state.get('objective', '')}\n"
+        f"Authorized: {authorized}. Use your tools, then summarize findings."
+    )
+    prior = list(state.get("messages", []))
+    result = agent.invoke({"messages": prior + [HumanMessage(task)]})
+    messages = result.get("messages", [])
+
+    tool_results = _harvest_tool_results(messages)
+    findings = _findings_from_results(tool_results, agent=name, target=state.get("target", ""))
+    updates = {
+        "messages": messages,
+        "tool_results": tool_results,
+        "completed_steps": [name],
+    }
+    return updates, findings
 
 
 def _default_factory(llm: Any, tools: list):
@@ -126,6 +150,7 @@ def _findings_from_results(tool_results: list[dict], agent: str, target: str) ->
                 "severity": _infer_severity(blob),
                 "source": agent,
                 "detail": f"status={status}; {blob[:160]}".strip(),
+                "_status": status,
             }
         )
     return findings

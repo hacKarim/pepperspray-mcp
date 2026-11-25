@@ -56,6 +56,16 @@ server, so you can drive it autonomously or from an MCP client like Claude Code.
   verify node re-checks them, looping under `--verify-budget` before reporting.
   Reports show per-finding **confidence** and a **verified** flag. On by default;
   disable with `--no-reflect`.
+- **Specialists as nested subgraphs.** Each specialist is its own compiled
+  `plan → act → verify` subgraph, not a single node — a two-tier reflection
+  (local verify inside each specialist, global critic across all findings).
+- **Durable persistence + time-travel.** Set `PEPPERSPRAY_CHECKPOINT_DB` to
+  persist runs to SQLite: a run can **pause at exploitation, survive a restart,
+  and resume on approval**. Inspect and resume durable runs:
+  ```bash
+  pepperspray history <thread-id>     # checkpoint timeline
+  pepperspray resume  <thread-id>     # approve exploitation + continue
+  ```
 
 ## Requirements
 
