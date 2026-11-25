@@ -18,20 +18,17 @@ from langchain_core.messages import HumanMessage
 from langchain_core.tools import StructuredTool
 
 from pepperspray.core.errors import AuthorizationError
-from pepperspray.core.registry import REGISTRY, ToolContext, ToolRegistry
-
-# Keys a builder might read for the primary target; we set them all to the same
-# value so a specialist tool needs only "target" + free-form "extra".
-_TARGET_ALIASES = ("target", "url", "domain", "base_url", "host", "ip")
+from pepperspray.core.registry import REGISTRY, ToolContext, ToolRegistry, spread_target
 
 
 def _make_lc_tool(
     spec, ctx: ToolContext, registry: ToolRegistry, authorized: bool
 ) -> StructuredTool:
     def _call(target: str = "", extra: str = "") -> str:
-        params: dict[str, Any] = {k: target for k in _TARGET_ALIASES}
-        if extra:
-            params["additional_args"] = extra
+        # ``target`` is the primary input: a host, URL, file path, image, etc.
+        # It is spread across every primary-input key so the tool's builder
+        # receives it regardless of which key it reads.
+        params: dict[str, Any] = spread_target(target, extra)
         try:
             result = registry.execute(spec.name, params, ctx, authorized=authorized)
         except AuthorizationError as exc:

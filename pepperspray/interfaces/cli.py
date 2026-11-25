@@ -38,13 +38,30 @@ def run(
         False, "--authorized/--no-authorized", help="Confirm you are authorized to test the target."
     ),
     model: str = typer.Option(None, help="Override the LLM model id."),
+    allow_exploitation: bool = typer.Option(
+        False,
+        "--allow-exploitation/--no-allow-exploitation",
+        help="Run exploitation-class steps without pausing for approval.",
+    ),
 ) -> None:
     """Run the full supervisor/specialist assessment graph."""
     _require_auth(authorized)
     load_all()
     llm = get_llm(model=model) if model else get_llm()
-    final = run_assessment(target=target, objective=objective, authorized=authorized, llm=llm)
+    final = run_assessment(
+        target=target,
+        objective=objective,
+        authorized=authorized,
+        llm=llm,
+        interrupt_exploitation=not allow_exploitation,
+    )
     typer.echo(final.get("report") or "(no report produced)")
+    if final.get("awaiting_approval"):
+        typer.echo(
+            "\n⏸  Paused before exploitation-class actions "
+            f"({', '.join(final['awaiting_approval'])}). "
+            "Re-run with --allow-exploitation to proceed (authorized targets only)."
+        )
 
 
 @app.command()

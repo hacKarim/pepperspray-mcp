@@ -32,3 +32,16 @@ def test_run_with_stub(monkeypatch):
     result = runner.invoke(cli.app, ["run", "--target", "example.com", "--authorized"])
     assert result.exit_code == 0
     assert "Report for example.com" in result.stdout
+
+
+def test_run_surfaces_exploitation_pause(monkeypatch):
+    monkeypatch.setattr(cli, "get_llm", lambda *a, **k: object())
+    monkeypatch.setattr(
+        cli,
+        "run_assessment",
+        lambda **kw: {"report": "# partial", "awaiting_approval": ["exploitation"]},
+    )
+    result = runner.invoke(cli.app, ["run", "--target", "t", "--authorized"])
+    assert result.exit_code == 0
+    assert "Paused before exploitation" in result.stdout
+    assert "--allow-exploitation" in result.stdout

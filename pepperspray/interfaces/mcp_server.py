@@ -9,10 +9,8 @@ from __future__ import annotations
 
 from typing import Any, Callable, Iterator
 
-from pepperspray.core.registry import REGISTRY, ToolContext
+from pepperspray.core.registry import REGISTRY, ToolContext, spread_target
 from pepperspray.tools import load_all
-
-_TARGET_ALIASES = ("target", "url", "domain", "base_url", "host", "ip")
 
 # High-level entrypoint names (for counting / introspection).
 HIGH_LEVEL = ["run_assessment", "run_chain", "list_tools"]
@@ -34,9 +32,7 @@ def _default_ctx() -> ToolContext:
 def _make_tool_wrapper(name: str, ctx: ToolContext) -> Callable:
     def wrapper(target: str = "", extra: str = "", authorized: bool = False) -> dict:
         """Invoke a PepperSpray tool. Set authorized=True only for targets you may test."""
-        params: dict[str, Any] = {k: target for k in _TARGET_ALIASES}
-        if extra:
-            params["additional_args"] = extra
+        params: dict[str, Any] = spread_target(target, extra)
         from pepperspray.core.errors import AuthorizationError
 
         try:

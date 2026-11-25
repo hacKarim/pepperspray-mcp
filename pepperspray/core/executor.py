@@ -1,9 +1,10 @@
 """Safe external-command execution.
 
 Runs tools as an argv ``list[str]`` with ``shell=False`` — no shell, no string
-interpolation, so a hostile parameter can never become a shell token. Every
-failure mode (missing binary, timeout, non-zero exit) returns a structured
-``ToolResult`` rather than raising.
+interpolation, so a hostile parameter can never become a shell token. Output is
+captured (not streamed) and bounded by a timeout. Every failure mode (missing
+binary, timeout, non-zero exit) returns a structured ``ToolResult`` rather than
+raising.
 """
 
 from __future__ import annotations

@@ -16,6 +16,38 @@ from pepperspray.core.executor import SafeCommandExecutor, ToolResult
 
 ExecutorKind = Literal["shell", "python", "orchestrator", "http"]
 
+# The primary-input keys a build_argv / run may read. The specialist and MCP
+# wrappers spread their single ``target`` value across all of these so a tool
+# that keys off a file path, image, account, etc. still receives the input.
+PRIMARY_ALIASES = (
+    "target",
+    "url",
+    "domain",
+    "base_url",
+    "host",
+    "ip",
+    "file",
+    "file_path",
+    "binary",
+    "memory_file",
+    "input_file",
+    "cover_file",
+    "image",
+    "directory",
+    "account",
+    "hash_file",
+    "libc_path",
+    "iac_dir",
+)
+
+
+def spread_target(value: str, extra: str = "") -> dict[str, Any]:
+    """Build a params dict mapping ``value`` to every primary alias (+ extra)."""
+    params: dict[str, Any] = {k: value for k in PRIMARY_ALIASES}
+    if extra:
+        params["additional_args"] = extra
+    return params
+
 
 @dataclass
 class ToolContext:
@@ -105,6 +137,15 @@ class ToolRegistry:
                     tool=spec.name, status="failed", error="shell tool has no build_argv"
                 )
             argv = spec.build_argv(params)
+            injected = _option_injection(argv, params)
+            if injected is not None:
+                return ToolResult(
+                    tool=spec.name,
+                    status="failed",
+                    argv=argv,
+                    error=f"refusing: value {injected!r} looks like an option "
+                    "(leading '-'); a target/path must not start with '-'",
+                )
             input_text = spec.build_input(params) if spec.build_input else None
             return ctx.executor.run(spec.name, argv, timeout=spec.timeout, input_text=input_text)
         # python / http / orchestrator
@@ -113,6 +154,27 @@ class ToolRegistry:
                 tool=spec.name, status="failed", error=f"{spec.executor_kind} tool has no run()"
             )
         return spec.run(params, ctx)
+
+
+def _option_injection(argv: list[str], params: dict) -> str | None:
+    """Return a user-supplied primary value that appears in argv as an option.
+
+    Guards against argument injection: a target/path that begins with '-' would
+    otherwise be interpreted by the tool as a flag. Only values the caller
+    supplied for a primary-input key are checked, so legitimate tool flags are
+    never rejected.
+    """
+    user_values = {
+        v
+        for k, v in params.items()
+        if k in PRIMARY_ALIASES and isinstance(v, str) and v.startswith("-")
+    }
+    if not user_values:
+        return None
+    for token in argv:
+        if token in user_values:
+            return token
+    return None
 
 
 # Process-wide singleton shared by tool spec modules, agents, and the MCP server.

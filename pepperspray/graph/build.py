@@ -90,5 +90,43 @@ def run_assessment(
         interrupt_exploitation=interrupt_exploitation,
     )
     state = new_state(target=target, objective=objective, authorized=authorized)
+    # Keep the recursion limit ahead of the step budget so FINISH is always
+    # reachable even for large budgets (2 hops per supervisor cycle + slack).
+    effective_limit = max(recursion_limit, state["step_budget"] * 2 + 10)
+    config = {"configurable": {"thread_id": thread_id}, "recursion_limit": effective_limit}
+    result = graph.invoke(state, config=config)
+
+    # If the graph paused at the exploitation HITL interrupt, it stopped before
+    # the reporting node. Surface a partial report and an approval marker rather
+    # than returning an empty, confusing result.
+    snapshot = graph.get_state(config)
+    if snapshot.next:
+        result = dict(result)
+        result["awaiting_approval"] = list(snapshot.next)
+        if not result.get("report"):
+            result["report"] = render_report(result)
+    return result
+
+
+def resume_after_approval(
+    ctx: ToolContext,
+    thread_id: str,
+    llm: Any = None,
+    registry: ToolRegistry = REGISTRY,
+    agent_factory: Callable | None = None,
+    router: Callable | None = None,
+    checkpointer: Any = None,
+    recursion_limit: int = 50,
+) -> dict:
+    """Resume a run paused at the exploitation interrupt (same thread_id)."""
+    graph = build_graph(
+        ctx,
+        llm=llm,
+        registry=registry,
+        agent_factory=agent_factory,
+        router=router,
+        checkpointer=checkpointer,
+        interrupt_exploitation=False,
+    )
     config = {"configurable": {"thread_id": thread_id}, "recursion_limit": recursion_limit}
-    return graph.invoke(state, config=config)
+    return graph.invoke(None, config=config)

@@ -199,12 +199,13 @@ _PY_SPECS = [
     (
         "install_python_package",
         _run_install_package,
-        {"description": "pip install a package", "active": True},
+        # RCE primitives: gate behind both authorization and the HITL interrupt.
+        {"description": "pip install a package", "active": True, "exploitation": True},
     ),
     (
         "execute_python_script",
         _run_execute_script,
-        {"description": "Run a python script locally", "active": True},
+        {"description": "Run a python script locally", "active": True, "exploitation": True},
     ),
 ]
 

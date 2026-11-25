@@ -124,7 +124,8 @@ def _dalfox(p: dict) -> list[str]:
 
 
 def _httpx(p: dict) -> list[str]:
-    argv = ["httpx", "-l", p.get("target", ""), "-t", str(p.get("threads", 50))]
+    # -u probes a single host directly; -l expects a FILE of targets (wrong here).
+    argv = ["httpx", "-u", p.get("target", ""), "-t", str(p.get("threads", 50))]
     argv += flag("-probe", p.get("probe", True))
     argv += flag("-tech-detect", p.get("tech_detect", False))
     argv += flag("-sc", p.get("status_code", False))
@@ -295,7 +296,7 @@ _SHELL_SPECS = [
         "httpx_probe",
         "httpx",
         _httpx,
-        {"description": "httpx HTTP probe", "build_input": lambda p: p.get("target", "")},
+        {"description": "httpx HTTP probe"},
     ),
     ("nikto_scan", "nikto", _nikto, {"description": "Nikto web server scanner"}),
     ("nuclei_scan", "nuclei", _nuclei, {"description": "Nuclei template-based vulnerability scan"}),
