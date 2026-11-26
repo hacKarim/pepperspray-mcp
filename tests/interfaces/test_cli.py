@@ -97,3 +97,22 @@ def test_history_handles_empty(monkeypatch):
     result = runner.invoke(cli.app, ["history", "nope-thread"])
     assert result.exit_code == 0
     assert "No checkpoints" in result.stdout
+
+
+def test_missing_llm_key_is_a_clean_error(monkeypatch):
+    from pepperspray.llm.provider import ConfigurationError
+
+    def _no_key(*a, **k):
+        raise ConfigurationError("Anthropic provider requires an API key.")
+
+    monkeypatch.setattr(cli, "get_llm", _no_key)
+    result = runner.invoke(cli.app, ["run", "--target", "example.com", "--authorized"])
+    assert result.exit_code == 2
+    assert "Configuration error" in result.output
+    assert not isinstance(result.exception, ConfigurationError)
+
+
+def test_unknown_chain_is_rejected_before_running():
+    result = runner.invoke(cli.app, ["chain", "nope", "--target", "x", "--authorized"])
+    assert result.exit_code == 2
+    assert "Unknown chain 'nope'" in result.output
