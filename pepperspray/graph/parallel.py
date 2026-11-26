@@ -37,7 +37,8 @@ def default_worker(payload: dict, ctx: ToolContext) -> dict:
         "source": "parallel-probe",
         "detail": (result.stdout or result.error or "")[:200],
     }
-    return {"tool_results": [result.to_dict()], "findings": [finding]}
+    # Same shape the specialists emit, so the report can read result.status.
+    return {"tool_results": [{"tool": tool, "result": result.to_dict()}], "findings": [finding]}
 
 
 def discover(state: dict) -> dict:

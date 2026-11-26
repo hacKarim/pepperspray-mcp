@@ -20,9 +20,15 @@ from langchain_core.tools import StructuredTool
 from pepperspray.core.errors import AuthorizationError
 from pepperspray.core.registry import REGISTRY, ToolContext, ToolRegistry, spread_target
 
+EXPLOITATION_AGENT = "exploitation"
+
 
 def _make_lc_tool(
-    spec, ctx: ToolContext, registry: ToolRegistry, authorized: bool
+    spec,
+    ctx: ToolContext,
+    registry: ToolRegistry,
+    authorized: bool,
+    allow_exploitation: bool = False,
 ) -> StructuredTool:
     def _call(target: str = "", extra: str = "") -> str:
         # ``target`` is the primary input: a host, URL, file path, image, etc.
@@ -30,7 +36,13 @@ def _make_lc_tool(
         # receives it regardless of which key it reads.
         params: dict[str, Any] = spread_target(target, extra)
         try:
-            result = registry.execute(spec.name, params, ctx, authorized=authorized)
+            result = registry.execute(
+                spec.name,
+                params,
+                ctx,
+                authorized=authorized,
+                allow_exploitation=allow_exploitation,
+            )
         except AuthorizationError as exc:
             return f"authorization required: {exc}"
         return json.dumps(result.to_dict())[:4000]
@@ -66,6 +78,21 @@ def make_specialist(
     return node
 
 
+def specialist_specs(name: str, families: list[str], registry: ToolRegistry) -> list:
+    """The tools a specialist is bound to.
+
+    Exploitation-class tools belong to the exploitation specialist only, whatever
+    registry family they are filed under (e.g. ``responder`` in recon, script
+    execution in utility). Every other specialist gets its families' tools minus
+    those, so exploitation never runs outside the HITL-gated agent.
+    """
+    specs = [s for fam in families for s in registry.by_family(fam)]
+    if name != EXPLOITATION_AGENT:
+        return [s for s in specs if not s.exploitation]
+    seen = {s.name for s in specs}
+    return specs + [s for s in registry.all() if s.exploitation and s.name not in seen]
+
+
 def run_specialist_act(
     name: str,
     families: list[str],
@@ -84,8 +111,11 @@ def run_specialist_act(
     verify step). Keeps the act logic in one place for both call sites.
     """
     authorized = bool(state.get("authorized", False))
-    specs = [s for fam in families for s in registry.by_family(fam)]
-    lc_tools = [_make_lc_tool(s, ctx, registry, authorized) for s in specs]
+    allow_exploitation = name == EXPLOITATION_AGENT and bool(
+        state.get("exploitation_approved", False)
+    )
+    specs = specialist_specs(name, families, registry)
+    lc_tools = [_make_lc_tool(s, ctx, registry, authorized, allow_exploitation) for s in specs]
 
     factory = agent_factory or _default_factory
     agent = factory(llm, lc_tools)

@@ -222,7 +222,13 @@ def _assessment_graph(
         retry_policy=retry_policy,
     )
     state = new_state(
-        target=target, objective=objective, authorized=authorized, verify_budget=verify_budget
+        target=target,
+        objective=objective,
+        authorized=authorized,
+        verify_budget=verify_budget,
+        # Without the HITL gate the operator approved exploitation up front
+        # (--allow-exploitation); with it, the gate sets this on approval.
+        exploitation_approved=not interrupt_exploitation,
     )
     # Keep the recursion limit ahead of the step budget so FINISH is always
     # reachable even for large budgets (2 hops per supervisor cycle + slack).

@@ -52,12 +52,45 @@ def _get_json(url: str, params: dict, timeout: int = 30) -> dict:
     return resp.json()
 
 
+_V2_AUTH_TO_PR = {"NONE": "NONE", "SINGLE": "LOW", "MULTIPLE": "HIGH"}
+
+
+def _normalize_v2(entry: dict, data: dict) -> dict:
+    """Map CVSS v2 fields onto the v3 names the scorer reads.
+
+    NVD v2 metrics use accessVector/accessComplexity/authentication, carry
+    ``userInteractionRequired`` and ``baseSeverity`` on the metric entry rather
+    than inside ``cvssData``.
+    """
+    data.setdefault("attackVector", data.get("accessVector", "UNKNOWN"))
+    # v2 has LOW/MEDIUM/HIGH; v3 only LOW/HIGH — treat MEDIUM as HIGH (conservative).
+    complexity = str(data.get("accessComplexity", "")).upper()
+    data.setdefault(
+        "attackComplexity",
+        {"LOW": "LOW", "MEDIUM": "HIGH", "HIGH": "HIGH"}.get(complexity, "UNKNOWN"),
+    )
+    data.setdefault(
+        "privilegesRequired",
+        _V2_AUTH_TO_PR.get(str(data.get("authentication", "")).upper(), "UNKNOWN"),
+    )
+    if "userInteractionRequired" in entry:
+        data.setdefault(
+            "userInteraction", "REQUIRED" if entry["userInteractionRequired"] else "NONE"
+        )
+    if not data.get("baseSeverity") and entry.get("baseSeverity"):
+        data["baseSeverity"] = entry["baseSeverity"]
+    return data
+
+
 def extract_cvss(metrics: dict) -> dict:
     """Pull the preferred CVSS metric block (v3.1 > v3.0 > v2), normalized."""
     for key in ("cvssMetricV31", "cvssMetricV30", "cvssMetricV2"):
         block = metrics.get(key)
         if block:
-            data = dict(block[0].get("cvssData", {}))
+            entry = block[0]
+            data = dict(entry.get("cvssData", {}))
+            if key == "cvssMetricV2":
+                data = _normalize_v2(entry, data)
             if "baseSeverity" in data and data["baseSeverity"]:
                 data["baseSeverity"] = str(data["baseSeverity"]).upper()
             return data

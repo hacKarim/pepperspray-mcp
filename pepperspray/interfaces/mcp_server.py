@@ -30,13 +30,21 @@ def _default_ctx() -> ToolContext:
 
 
 def _make_tool_wrapper(name: str, ctx: ToolContext) -> Callable:
-    def wrapper(target: str = "", extra: str = "", authorized: bool = False) -> dict:
-        """Invoke a PepperSpray tool. Set authorized=True only for targets you may test."""
+    def wrapper(
+        target: str = "",
+        extra: str = "",
+        authorized: bool = False,
+        allow_exploitation: bool = False,
+    ) -> dict:
+        """Invoke a PepperSpray tool. Set authorized=True only for targets you may test;
+        exploitation-class tools also need allow_exploitation=True."""
         params: dict[str, Any] = spread_target(target, extra)
         from pepperspray.core.errors import AuthorizationError
 
         try:
-            return REGISTRY.execute(name, params, ctx, authorized=authorized).to_dict()
+            return REGISTRY.execute(
+                name, params, ctx, authorized=authorized, allow_exploitation=allow_exploitation
+            ).to_dict()
         except AuthorizationError as exc:
             return {"status": "failed", "error": f"authorization required: {exc}"}
 
@@ -63,12 +71,21 @@ def iter_mcp_tools(ctx: ToolContext) -> Iterator[tuple[str, str, Callable]]:
             "completed_steps": final.get("completed_steps", []),
         }
 
-    def run_chain_tool(name: str, target: str, authorized: bool = False) -> dict:
+    def run_chain_tool(
+        name: str, target: str, authorized: bool = False, allow_exploitation: bool = False
+    ) -> dict:
         """Run a named fixed workflow (chain) against a target."""
         from pepperspray.graph.chains import run_chain
         from pepperspray.llm.provider import get_llm
 
-        final = run_chain(name, target=target, authorized=authorized, ctx=ctx, llm=get_llm())
+        final = run_chain(
+            name,
+            target=target,
+            authorized=authorized,
+            ctx=ctx,
+            llm=get_llm(),
+            allow_exploitation=allow_exploitation,
+        )
         return {"report": final.get("report"), "findings": final.get("findings", [])}
 
     def list_tools_tool(family: str = "") -> dict:

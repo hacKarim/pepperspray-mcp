@@ -9,6 +9,8 @@ as single argv elements; only free-form ``additional_args`` is tokenized via
 
 from __future__ import annotations
 
+import shutil
+
 from pepperspray.core.registry import REGISTRY, ToolRegistry, ToolSpec
 from pepperspray.tools.specs._helpers import extra, flag, opt
 
@@ -123,9 +125,15 @@ def _dalfox(p: dict) -> list[str]:
 # --- probing / vuln scanning ----------------------------------------------
 
 
+def _httpx_binary() -> str:
+    """ProjectDiscovery httpx ships as ``httpx-toolkit`` on Kali (the image's
+    base) to avoid clashing with the Python ``httpx`` CLI; prefer that name."""
+    return "httpx-toolkit" if shutil.which("httpx-toolkit") else "httpx"
+
+
 def _httpx(p: dict) -> list[str]:
     # -u probes a single host directly; -l expects a FILE of targets (wrong here).
-    argv = ["httpx", "-u", p.get("target", ""), "-t", str(p.get("threads", 50))]
+    argv = [_httpx_binary(), "-u", p.get("target", ""), "-t", str(p.get("threads", 50))]
     argv += flag("-probe", p.get("probe", True))
     argv += flag("-tech-detect", p.get("tech_detect", False))
     argv += flag("-sc", p.get("status_code", False))

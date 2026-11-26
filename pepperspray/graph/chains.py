@@ -62,12 +62,20 @@ def run_chain(
     registry: ToolRegistry = REGISTRY,
     agent_factory: Callable | None = None,
     thread_id: str = "chain",
+    allow_exploitation: bool = False,
 ) -> dict:
+    """Run a fixed workflow. Chains have no HITL gate, so exploitation-class
+    tools stay refused unless ``allow_exploitation`` is passed explicitly."""
     if ctx is None:
         from pepperspray.core.cache import ResultCache
         from pepperspray.core.executor import SafeCommandExecutor
 
         ctx = ToolContext(executor=SafeCommandExecutor(300), cache=ResultCache())
     graph = build_chain(name, ctx, llm=llm, registry=registry, agent_factory=agent_factory)
-    state = new_state(target=target, objective=objective, authorized=authorized)
+    state = new_state(
+        target=target,
+        objective=objective,
+        authorized=authorized,
+        exploitation_approved=allow_exploitation,
+    )
     return graph.invoke(state, config={"configurable": {"thread_id": thread_id}})

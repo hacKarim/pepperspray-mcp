@@ -124,6 +124,11 @@ def chain(
     subtargets: str = typer.Option(
         "", help="parallel_scan only: comma-separated hosts/URLs to fan out over."
     ),
+    allow_exploitation: bool = typer.Option(
+        False,
+        "--allow-exploitation/--no-allow-exploitation",
+        help="Let the chain's exploitation step run exploitation-class tools.",
+    ),
 ) -> None:
     """Run a named fixed workflow (or 'parallel_scan' for concurrent fan-out)."""
     _require_auth(authorized)
@@ -136,7 +141,13 @@ def chain(
         subs = [s.strip() for s in subtargets.split(",") if s.strip()]
         final = run_parallel_scan(target, subtargets=subs, authorized=authorized)
     else:
-        final = run_chain(name, target=target, authorized=authorized, llm=get_llm())
+        final = run_chain(
+            name,
+            target=target,
+            authorized=authorized,
+            llm=get_llm(),
+            allow_exploitation=allow_exploitation,
+        )
     typer.echo(final.get("report") or "(no report produced)")
 
 

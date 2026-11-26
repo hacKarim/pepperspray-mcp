@@ -52,6 +52,7 @@ def new_state(
     step_budget: int | None = None,
     verify_budget: int = 1,
     subtargets: list[str] | None = None,
+    exploitation_approved: bool = False,
 ) -> AssessmentState:
     budget = step_budget if step_budget is not None else get_settings().step_budget
     return AssessmentState(
@@ -69,6 +70,7 @@ def new_state(
         subtargets=list(subtargets or []),
         verify_budget=verify_budget,
         reflection="pending",
+        exploitation_approved=exploitation_approved,
     )
 
 

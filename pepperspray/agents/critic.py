@@ -30,11 +30,16 @@ class Critique(BaseModel):
     scores: list[FindingScore]
 
 
+def _finding_key(f: dict) -> tuple[str, str]:
+    """Identity of a finding for dedupe and verification: (title, source)."""
+    return (str(f.get("title", "")).lower().strip(), str(f.get("source", "")))
+
+
 def _dedupe(findings: list[dict]) -> list[dict]:
     seen: set[tuple] = set()
     out: list[dict] = []
     for f in findings:
-        key = (str(f.get("title", "")).lower().strip(), str(f.get("source", "")))
+        key = _finding_key(f)
         if key in seen:
             continue
         seen.add(key)
@@ -108,11 +113,11 @@ def verify_node(
     curated = state.get("curated_findings", [])
     to_verify = state.get("to_verify", [])
     verify_fn = verifier or _default_verifier
-    by_title = {f.get("title"): f for f in curated}
+    by_key = {_finding_key(f): f for f in curated}
 
     for pending in to_verify:
         confirmed = bool(verify_fn(pending, ctx))
-        target = by_title.get(pending.get("title"))
+        target = by_key.get(_finding_key(pending))
         if target is not None:
             target["verified"] = confirmed
             target["confidence"] = 0.95 if confirmed else 0.2

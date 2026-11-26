@@ -107,12 +107,21 @@ class ToolRegistry:
         params: dict,
         ctx: ToolContext,
         authorized: bool,
+        allow_exploitation: bool = False,
     ) -> ToolResult:
         spec = self.get(name)
         if spec.active and not authorized:
             raise AuthorizationError(
                 f"tool '{name}' is active and requires authorization "
                 "(pass authorized=True only for targets you may test)"
+            )
+        # Exploitation-class tools need an explicit operator approval on top of
+        # authorization, whatever family they live in, so the HITL gate cannot be
+        # sidestepped by a specialist that happens to hold such a tool.
+        if spec.exploitation and not allow_exploitation:
+            raise AuthorizationError(
+                f"tool '{name}' is exploitation-class and requires operator approval "
+                "(allow_exploitation=True)"
             )
 
         merged = {**spec.param_defaults, **(params or {})}
