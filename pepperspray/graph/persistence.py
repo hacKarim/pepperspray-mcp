@@ -20,7 +20,12 @@ def get_checkpointer(checkpoint_db: str | None = None):
     from langgraph.checkpoint.sqlite import SqliteSaver
 
     conn = sqlite3.connect(checkpoint_db, check_same_thread=False)
-    return SqliteSaver(conn)
+    saver = SqliteSaver(conn)
+    # Create the checkpoint tables up front. It is idempotent (CREATE TABLE IF
+    # NOT EXISTS); some langgraph-checkpoint-sqlite builds do not auto-setup on
+    # first put/get, which would otherwise fail with "no such table".
+    saver.setup()
+    return saver
 
 
 def list_checkpoints(graph: Any, thread_id: str, limit: int = 50) -> list[dict]:

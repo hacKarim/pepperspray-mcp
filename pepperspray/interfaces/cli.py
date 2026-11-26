@@ -16,7 +16,7 @@ import typer
 from pepperspray.config import get_settings
 from pepperspray.graph.build import run_assessment, stream_assessment, stream_resume
 from pepperspray.graph.chains import CHAINS, run_chain
-from pepperspray.llm.provider import get_llm
+from pepperspray.llm.provider import ConfigurationError, get_llm
 from pepperspray.obs import configure_tracing
 from pepperspray.tools import load_all
 
@@ -40,6 +40,15 @@ def _render_stream(events) -> None:
             )
         elif ev["type"] == "report":
             typer.echo("\n" + (ev.get("report") or "(no report produced)"))
+
+
+def _llm(model: str | None = None):
+    """Build the LLM, turning a missing key/provider into a clean CLI error."""
+    try:
+        return get_llm(model=model) if model else get_llm()
+    except ConfigurationError as exc:
+        typer.echo(f"Configuration error: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
 
 
 def _require_auth(authorized: bool) -> None:
@@ -79,7 +88,7 @@ def run(
     _require_auth(authorized)
     load_all()
     configure_tracing()
-    llm = get_llm(model=model) if model else get_llm()
+    llm = _llm(model)
 
     if stream:
         typer.echo(f"▶  Streaming assessment of {target} (thread: {thread_id})")
@@ -132,6 +141,12 @@ def chain(
 ) -> None:
     """Run a named fixed workflow (or 'parallel_scan' for concurrent fan-out)."""
     _require_auth(authorized)
+    if name != "parallel_scan" and name not in CHAINS:
+        typer.echo(
+            f"Unknown chain '{name}'. Available: {', '.join(sorted(CHAINS))}, parallel_scan",
+            err=True,
+        )
+        raise typer.Exit(code=2)
     load_all()
     configure_tracing()
     if name == "parallel_scan":
@@ -145,7 +160,7 @@ def chain(
             name,
             target=target,
             authorized=authorized,
-            llm=get_llm(),
+            llm=_llm(),
             allow_exploitation=allow_exploitation,
         )
     typer.echo(final.get("report") or "(no report produced)")
@@ -202,10 +217,10 @@ def resume(
 
     if stream:
         typer.echo(f"▶  Exploitation {verb}; streaming resume (thread: {thread_id})")
-        _render_stream(stream_resume(ctx, thread_id=thread_id, decision=decision, llm=get_llm()))
+        _render_stream(stream_resume(ctx, thread_id=thread_id, decision=decision, llm=_llm()))
         return
 
-    final = resume_after_approval(ctx, thread_id=thread_id, decision=decision, llm=get_llm())
+    final = resume_after_approval(ctx, thread_id=thread_id, decision=decision, llm=_llm())
     typer.echo(f"Exploitation {verb}; run resumed.\n")
     typer.echo(final.get("report") or "(no report produced)")
 

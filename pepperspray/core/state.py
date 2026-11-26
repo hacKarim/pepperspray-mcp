@@ -36,6 +36,9 @@ class AssessmentState(TypedDict, total=False):
     # Reflection loop: remaining verification passes and current reflection phase.
     verify_budget: int
     reflection: str
+    # Whether the reflection loop (critic/verify) is part of this run's graph.
+    # Persisted so a resumed run rebuilds the same topology it checkpointed.
+    reflect: bool
     # Critic output (overwrite, no reducer): curated/deduped findings + the subset
     # the critic flagged for a verification pass.
     curated_findings: list[dict]
@@ -53,6 +56,7 @@ def new_state(
     verify_budget: int = 1,
     subtargets: list[str] | None = None,
     exploitation_approved: bool = False,
+    reflect: bool = True,
 ) -> AssessmentState:
     budget = step_budget if step_budget is not None else get_settings().step_budget
     return AssessmentState(
@@ -71,6 +75,7 @@ def new_state(
         verify_budget=verify_budget,
         reflection="pending",
         exploitation_approved=exploitation_approved,
+        reflect=reflect,
     )
 
 

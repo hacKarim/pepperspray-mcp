@@ -107,7 +107,10 @@ def _as_node(compiled: Any) -> Callable[[dict], dict]:
 
     def node(state: dict) -> dict:
         sub_state = dict(state)
-        for key in ("findings", "tool_results", "completed_steps"):
+        # Zero every reducer-backed accumulator, messages included: the subgraph
+        # should return only the rows it produced, not re-emit the whole history
+        # (which would grow the messages channel on every concurrent fan-out).
+        for key in ("findings", "tool_results", "completed_steps", "messages"):
             sub_state[key] = []
         out = compiled.invoke(sub_state)
         return {k: out[k] for k in _MERGE_KEYS if k in out}

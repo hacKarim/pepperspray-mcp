@@ -22,6 +22,22 @@ from pepperspray.core.registry import REGISTRY, ToolContext, ToolRegistry, sprea
 
 EXPLOITATION_AGENT = "exploitation"
 
+# Per-field caps so a tool's serialized result stays a bounded, VALID JSON
+# object. Slicing the JSON string itself (the old approach) corrupted it for any
+# output over the limit, so the harvester fell back to {"raw": ...} and dropped
+# status/stdout — every such finding degraded to "? / info".
+_STDOUT_CAP = 2000
+_FIELD_CAP = 800
+
+
+def _serialize_result(result) -> str:
+    data = result.to_dict()
+    for key, cap in (("stdout", _STDOUT_CAP), ("stderr", _FIELD_CAP), ("error", _FIELD_CAP)):
+        val = data.get(key)
+        if isinstance(val, str) and len(val) > cap:
+            data[key] = val[:cap] + "…[truncated]"
+    return json.dumps(data)
+
 
 def _make_lc_tool(
     spec,
@@ -45,7 +61,7 @@ def _make_lc_tool(
             )
         except AuthorizationError as exc:
             return f"authorization required: {exc}"
-        return json.dumps(result.to_dict())[:4000]
+        return _serialize_result(result)
 
     return StructuredTool.from_function(
         func=_call,

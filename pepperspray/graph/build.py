@@ -229,6 +229,7 @@ def _assessment_graph(
         # Without the HITL gate the operator approved exploitation up front
         # (--allow-exploitation); with it, the gate sets this on approval.
         exploitation_approved=not interrupt_exploitation,
+        reflect=reflect,
     )
     # Keep the recursion limit ahead of the step budget so FINISH is always
     # reachable even for large budgets (2 hops per supervisor cycle + slack).
@@ -261,6 +262,28 @@ def _finalize(graph: Any, config: dict, result: dict) -> dict:
     return out
 
 
+def _resolve_checkpointer(checkpointer):
+    if checkpointer is not None:
+        return checkpointer
+    from pepperspray.config import get_settings
+
+    return get_checkpointer(get_settings().checkpoint_db)
+
+
+def _checkpointed_reflect(checkpointer, thread_id: str, default: bool) -> bool:
+    """Read the ``reflect`` flag the paused run stored, so the resumed graph is
+    the same topology that wrote the checkpoint. Falls back to ``default`` when
+    the checkpoint predates this field or cannot be read."""
+    cfg = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
+    try:
+        tup = checkpointer.get_tuple(cfg)
+    except Exception:
+        return default
+    values = (getattr(tup, "checkpoint", None) or {}).get("channel_values", {}) if tup else {}
+    stored = values.get("reflect")
+    return bool(stored) if stored is not None else default
+
+
 def resume_after_approval(
     ctx: ToolContext,
     thread_id: str,
@@ -271,7 +294,7 @@ def resume_after_approval(
     agent_factory: Callable | None = None,
     router: Callable | None = None,
     checkpointer: Any = None,
-    reflect: bool = True,
+    reflect: bool | None = None,
     scorer: Callable | None = None,
     verifier: Callable | None = None,
     recursion_limit: int = 50,
@@ -285,6 +308,9 @@ def resume_after_approval(
     """
     from langgraph.types import Command
 
+    checkpointer = _resolve_checkpointer(checkpointer)
+    if reflect is None:
+        reflect = _checkpointed_reflect(checkpointer, thread_id, default=True)
     graph = build_graph(
         ctx,
         llm=llm,
@@ -380,7 +406,7 @@ def stream_resume(
     agent_factory: Callable | None = None,
     router: Callable | None = None,
     checkpointer: Any = None,
-    reflect: bool = True,
+    reflect: bool | None = None,
     scorer: Callable | None = None,
     verifier: Callable | None = None,
     recursion_limit: int = 50,
@@ -388,6 +414,9 @@ def stream_resume(
     """Stream a resume of a run paused at the HITL gate (same thread_id)."""
     from langgraph.types import Command
 
+    checkpointer = _resolve_checkpointer(checkpointer)
+    if reflect is None:
+        reflect = _checkpointed_reflect(checkpointer, thread_id, default=True)
     graph = build_graph(
         ctx,
         llm=llm,

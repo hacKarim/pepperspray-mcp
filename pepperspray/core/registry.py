@@ -38,6 +38,13 @@ PRIMARY_ALIASES = (
     "hash_file",
     "libc_path",
     "iac_dir",
+    # Python-tool primary inputs (CVE id, CTF text/flag, JWT) so these tools are
+    # reachable through the single-``target`` agent and MCP wrappers too.
+    "cve_id",
+    "text",
+    "flag",
+    "token",
+    "jwt_token",
 )
 
 

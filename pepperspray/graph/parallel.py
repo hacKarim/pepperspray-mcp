@@ -18,6 +18,8 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Send
 
+from pepperspray.core.errors import AuthorizationError
+from pepperspray.core.executor import ToolResult
 from pepperspray.core.registry import REGISTRY, ToolContext, ToolRegistry, spread_target
 from pepperspray.core.state import AssessmentState, new_state
 from pepperspray.reporting.report import render_report
@@ -30,7 +32,12 @@ def default_worker(payload: dict, ctx: ToolContext) -> dict:
     target = payload.get("target", "")
     authorized = bool(payload.get("authorized", False))
     tool = payload.get("probe_tool", DEFAULT_PROBE_TOOL)
-    result = REGISTRY.execute(tool, spread_target(target), ctx, authorized=authorized)
+    try:
+        result = REGISTRY.execute(tool, spread_target(target), ctx, authorized=authorized)
+    except AuthorizationError as exc:
+        # An unauthorized fan-out must degrade to a structured row, never crash
+        # the whole scan graph (the specialist/MCP wrappers degrade the same way).
+        result = ToolResult(tool=tool, status="unavailable", error=str(exc))
     finding = {
         "title": f"probe {target}: {result.status}",
         "severity": "info",
