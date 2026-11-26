@@ -10,10 +10,10 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 dependencies = [
-    "langgraph>=0.2",
+    "langgraph>=1.0,<2",
     "langgraph-checkpoint-sqlite>=2.0",
-    "langchain-core>=0.3",
-    "langchain-anthropic>=0.2",
+    "langchain-core>=1.0",
+    "langchain-anthropic>=1.0",
     "pydantic>=2",
     "pydantic-settings>=2",
     "typer>=0.12",
@@ -25,8 +25,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-openai = ["langchain-openai>=0.2"]
-ollama = ["langchain-ollama>=0.2"]
+openai = ["langchain-openai>=1.0"]
+ollama = ["langchain-ollama>=1.0"]
 browser = ["playwright>=1.40"]
 dev = ["pytest>=8", "ruff", "black"]
 

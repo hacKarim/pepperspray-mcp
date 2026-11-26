@@ -100,6 +100,9 @@ server, so you can drive it autonomously or from an MCP client like Claude Code.
 
 - Docker (the security binaries live in the image — this is the supported runtime)
 - An LLM API key for the agents' reasoning (`ANTHROPIC_API_KEY` by default)
+- For local (non-Docker) runs and the test suite: Python 3.11+ and LangGraph 1.x
+  (the graph uses node-level retry/cache policies and dynamic interrupts, which
+  require LangGraph 1.x; the pins in `pyproject.toml` enforce this)
 
 ## Quick start (Docker)
 
