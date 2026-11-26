@@ -1,0 +1,181 @@
+"""Reflection: a critic agent that scores and dedupes findings, and a verify
+node that re-checks the low-confidence ones. Together they form an
+evaluator-optimizer loop bounded by ``verify_budget``:
+
+    specialists → critic → (verify → critic)* → reporting
+
+The critic's scorer is injectable (an LLM with structured output in production,
+a stub in tests), the same pattern as the supervisor's router.
+"""
+
+from __future__ import annotations
+
+from typing import Any, Callable
+
+from pydantic import BaseModel, Field
+
+
+class FindingScore(BaseModel):
+    """The critic's judgement of one finding."""
+
+    index: int
+    confidence: float = Field(ge=0.0, le=1.0)
+    needs_verification: bool = False
+    reason: str = ""
+
+
+class Critique(BaseModel):
+    """The critic's judgement of a batch of findings."""
+
+    scores: list[FindingScore]
+
+
+def _finding_key(f: dict) -> tuple[str, str]:
+    """Identity of a finding for dedupe and verification: (title, source)."""
+    return (str(f.get("title", "")).lower().strip(), str(f.get("source", "")))
+
+
+def _dedupe(findings: list[dict]) -> list[dict]:
+    seen: set[tuple] = set()
+    out: list[dict] = []
+    for f in findings:
+        key = _finding_key(f)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(dict(f))
+    return out
+
+
+def _llm_scorer(llm: Any) -> Callable[[list[dict]], Critique]:
+    structured = llm.with_structured_output(Critique)
+
+    def score(findings: list[dict]) -> Critique:
+        lines = "\n".join(
+            f"{i}. [{f.get('severity', 'info')}] {f.get('title', '')} "
+            f"(source: {f.get('source', '')}) — {f.get('detail', '')}"
+            for i, f in enumerate(findings)
+        )
+        prompt = (
+            "You are a security findings reviewer. For each finding, estimate a "
+            "confidence (0-1) that it is a real, correctly-identified issue, and "
+            "set needs_verification=true for anything impactful but unconfirmed "
+            "(e.g. injection, auth bypass, RCE) that a second check should confirm "
+            "before it goes in the report.\n\nFindings:\n" + lines
+        )
+        return structured.invoke(prompt)
+
+    return score
+
+
+def critic_node(
+    state: dict,
+    scorer: Callable[[list[dict]], Critique] | None = None,
+    llm: Any = None,
+) -> dict:
+    """Dedupe findings, score them, and decide whether a verify pass is needed.
+
+    On a re-entry after a verify pass, build on the already-curated findings so
+    confidence/verified annotations are preserved rather than recomputed.
+    """
+    base = state.get("curated_findings")
+    deduped = list(base) if base else _dedupe(state.get("findings", []))
+    if not deduped:
+        return {"curated_findings": [], "to_verify": [], "reflection": "done"}
+
+    # Degrade gracefully: with no scorer and no LLM, skip scoring and finish.
+    if scorer is None and llm is None:
+        return {"curated_findings": deduped, "to_verify": [], "reflection": "done"}
+
+    score_fn = scorer or _llm_scorer(llm)
+    critique = score_fn(deduped)
+    by_index = {s.index: s for s in critique.scores}
+
+    to_verify: list[dict] = []
+    for i, finding in enumerate(deduped):
+        s = by_index.get(i)
+        if s is not None:
+            finding["confidence"] = s.confidence
+            if s.needs_verification and not finding.get("verified"):
+                to_verify.append(finding)
+
+    budget = int(state.get("verify_budget", 0))
+    reflection = "verify" if (to_verify and budget > 0) else "done"
+    return {"curated_findings": deduped, "to_verify": to_verify, "reflection": reflection}
+
+
+def verify_node(
+    state: dict,
+    verifier: Callable[[dict, Any], bool] | None = None,
+    ctx: Any = None,
+) -> dict:
+    """Attempt to confirm each flagged finding; annotate and decrement the budget."""
+    curated = state.get("curated_findings", [])
+    to_verify = state.get("to_verify", [])
+    verify_fn = verifier or _default_verifier
+    by_key = {_finding_key(f): f for f in curated}
+
+    for pending in to_verify:
+        confirmed = bool(verify_fn(pending, ctx))
+        target = by_key.get(_finding_key(pending))
+        if target is not None:
+            target["verified"] = confirmed
+            target["confidence"] = 0.95 if confirmed else 0.2
+
+    return {
+        "curated_findings": curated,
+        "to_verify": [],
+        "verify_budget": max(0, int(state.get("verify_budget", 0)) - 1),
+        "reflection": "pending",
+    }
+
+
+def _default_verifier(finding: dict, ctx: Any) -> bool:
+    """Conservative default: without a real re-check we cannot confirm, so don't."""
+    return False
+
+
+def make_rerun_verifier(registry: Any, authorized: bool = False) -> Callable[[dict, Any], bool]:
+    """A real verifier: re-run the finding's originating tool and confirm it.
+
+    Uses the ``_tool``/``_target`` metadata each finding carries. A finding is
+    confirmed only when a fresh run of the same read-only tool succeeds again —
+    a reproducible signal, not a one-off. Exploitation-class tools are never
+    auto-rerun to "verify" (that would re-attack the target); they stay
+    unconfirmed for a human to check.
+    """
+
+    def verify(finding: dict, ctx: Any) -> bool:
+        tool = finding.get("_tool")
+        target = finding.get("_target")
+        if not tool or not target or ctx is None:
+            return False
+        try:
+            spec = registry.get(tool)
+        except KeyError:
+            # The originating tool is not (or no longer) registered: we cannot
+            # reproduce the finding, so leave it unconfirmed rather than crash.
+            return False
+        if spec is None or getattr(spec, "exploitation", False):
+            return False
+        # Re-run with the authorization of the run that produced the finding,
+        # never a broader one — a finding from an unauthorized run must not
+        # trigger an active-tool execution here. Fall back to the verifier's
+        # own default only when the finding predates this metadata.
+        run_authorized = bool(finding.get("_authorized", authorized))
+        from pepperspray.core.registry import spread_target
+
+        try:
+            result = registry.execute(tool, spread_target(target), ctx, authorized=run_authorized)
+        except Exception:
+            return False
+        return getattr(result, "status", "") == "success"
+
+    return verify
+
+
+def route_reflection(state: dict) -> str:
+    """Conditional edge after the critic: loop to verify, or go to reporting."""
+    if state.get("reflection") == "verify" and int(state.get("verify_budget", 0)) > 0:
+        return "verify"
+    return "reporting"

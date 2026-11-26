@@ -1,84 +1,125 @@
-# PepperSpray-MCP
+# PepperSpray
 
 [![CI](https://github.com/hacKarim/pepperspray-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/hacKarim/pepperspray-mcp/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
-![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)
-![MCP](https://img.shields.io/badge/MCP-Model_Context_Protocol-111)
+![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
+![LangGraph](https://img.shields.io/badge/LangGraph-multi--agent-111)
 
-A Model Context Protocol (MCP) server that puts a penetration-testing toolkit
-behind an AI assistant. It exposes reconnaissance, scanning, and vulnerability
-analysis tooling as MCP tools, so a client like Claude can drive a security
-assessment conversationally while the heavy lifting runs inside a sandboxed
-Docker container.
+LangGraph multi-agent security assessment. CLI + MCP server. 114 tools.
 
-> ### ⚠️ Authorized use only
->
-> This project is for **authorized security testing, research, and education**.
-> Only run it against systems you own or have **explicit written permission** to
-> test. Unauthorized scanning or exploitation is illegal in most jurisdictions.
-> You are solely responsible for how you use it. Provided **as-is, with no
-> warranty**.
+> ⚠️ Authorized targets only. Active runs need `--authorized`.
 
-## Architecture
+## Graph
 
-```
-MCP client (Claude)
-      │  stdio
-      ▼
-mcp-pepperspray-wrapper.sh ──► tcp_stdio_bridge.py ──► TCP
-                                                        │
-                                                        ▼
-                                      pepperspray_server.py  (Docker)
-                                      ├─ tool registry & execution
-                                      ├─ recon / scanning modules
-                                      └─ vulnerability analysis
+```mermaid
+flowchart LR
+    START((start)) --> SUP[supervisor]
+    SUP -->|parallel| RECON[recon]
+    SUP -->|parallel| WEB[web]
+    SUP -->|parallel| CVE[cve]
+    SUP --> BIN[binary] & CLOUD[cloud] & FOR[forensics]
+    SUP --> GATE{{human gate}}
+    GATE -->|approve| EXP[exploitation]
+    GATE -->|deny| SUP
+    RECON & WEB & CVE & BIN & CLOUD & FOR & EXP --> SUP
+    SUP -->|FINISH| CRITIC[critic]
+    CRITIC <--> VERIFY[verify]
+    CRITIC --> REP[reporting] --> END((end))
 ```
 
-- `pepperspray_server.py`: the core server that registers and executes the tooling
-- `pepperspray_mcp.py`: MCP protocol handlers and tool definitions
-- `tcp_stdio_bridge.py`: bridges the MCP client's stdio to the container's TCP socket
-- `mcp-pepperspray-wrapper.sh`: thin launcher the MCP client invokes
+Each specialist:
 
-## Requirements
+```mermaid
+flowchart LR
+    plan --> act --> verify
+```
 
-- Docker + Docker Compose
-- `socat` for the stdio to TCP bridge (`brew install socat`)
+Parallel scan:
+
+```mermaid
+flowchart LR
+    discover -->|Send| P1[probe a] & P2[probe b] & P3[probe c] --> collect --> reporting
+```
+
+## Run
+
+Example output, abridged.
+
+```console
+$ pepperspray run --target http://juice-shop:3000 --authorized --stream
+▶  Streaming assessment of http://juice-shop:3000 (thread: assessment)
+  → supervisor
+  → cve      (+2 findings)
+  → recon    (+5 findings)     ← same superstep
+  → web      (+4 findings)
+  → supervisor
+
+⏸  Paused before exploitation-class actions (exploitation).
+    Approve exploitation-class actions against this target?
+
+$ pepperspray resume assessment --stream
+  → exploitation_gate
+  → exploitation  (+1 findings)
+  → supervisor
+  → critic
+  → verify
+  → critic
+  → reporting
+```
+
+```console
+$ pepperspray chain parallel_scan --target example.com \
+    --subtargets "a.example.com,b.example.com,c.example.com" --authorized
+```
+
+## Features
+
+- Supervisor routing
+- Parallel specialists
+- `Send` fan-out
+- Human approval gate
+- Critic reflection
+- Nested subgraphs
+- SQLite checkpoints
+- Resume, time-travel
+- Live streaming
+- Retry + cache
+- LangSmith (opt-in)
+- Argv-only execution
+
+## Commands
+
+| Command | Does |
+|---|---|
+| `run` | Full assessment |
+| `chain <name>` | Fixed workflow |
+| `resume <thread>` | Approve / deny |
+| `history <thread>` | Checkpoint timeline |
+| `list-tools` | Tool registry |
+| `mcp` | MCP server |
 
 ## Quick start
 
 ```bash
-git clone <repository> pepperspray-mcp && cd pepperspray-mcp
-cp .env.example .env
-docker compose up -d --build
+cp .env.example .env        # ANTHROPIC_API_KEY
+docker compose build
+docker compose run --rm pepperspray pepperspray run --target <url> --authorized
 ```
 
-Register it with Claude Code:
-
-```bash
-claude mcp add pepperspray -- bash -c "/absolute/path/to/mcp-pepperspray-wrapper.sh"
-claude mcp list        # verify it connected
-```
-
-Or add it to any MCP client config manually:
+MCP client:
 
 ```json
-{
-  "mcpServers": {
-    "pepperspray": {
-      "command": "bash",
-      "args": ["-c", "/absolute/path/to/mcp-pepperspray-wrapper.sh"],
-      "timeout": 300
-    }
-  }
-}
+{ "mcpServers": { "pepperspray": {
+  "command": "docker",
+  "args": ["run", "--rm", "-i", "-e", "ANTHROPIC_API_KEY", "pepperspray:2.0.0"] } } }
 ```
 
-## Configuration
+## Dev
 
-Copy `.env.example` to `.env`. Core settings (ports, host, timeouts) work out of
-the box. Optional third-party API keys (Shodan, Censys, VirusTotal) unlock
-additional enrichment when provided.
+```bash
+pip install -e ".[dev,openai,ollama]"
+ruff check pepperspray tests && black --check pepperspray tests && pytest -q
+```
 
 ## License
 

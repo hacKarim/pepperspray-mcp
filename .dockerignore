@@ -4,15 +4,11 @@ __pycache__/
 *$py.class
 *.so
 .Python
+.venv/
 venv/
 env/
 ENV/
-pepperspray_env/
-
-# Docker
-.dockerignore
-docker-compose.yml
-docker-compose.*.yml
+.pytest_cache/
 
 # Git
 .git/
@@ -32,10 +28,9 @@ results/
 cache/
 logs/
 
-# Documentation
-README.md
-README_DOCKER.md
-*.md
+# Superpowers scratch + legacy v1 code (not part of the v2 image)
+.superpowers/
+legacy/
 docs/
 
 # Temporary files
@@ -43,4 +38,5 @@ docs/
 *.log
 .env
 .env.local
-*.pyc
+
+# NOTE: README.md is intentionally NOT ignored — the Dockerfile COPYs it.
