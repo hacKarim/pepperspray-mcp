@@ -135,3 +135,36 @@ def test_findings_carry_run_authorization():
     assert auth[0]["_authorized"] is True
     unauth = _findings_from_results(tool_results, agent="recon", target="x", authorized=False)
     assert unauth[0]["_authorized"] is False
+
+
+def test_specialist_does_not_resend_prior_transcript():
+    """Each specialist should receive only its own task, not the whole growing
+    multi-agent transcript — otherwise token cost is O(n^2) in the hop count and
+    a long run can overflow the model's context window."""
+    reg = _reg_with_echo()
+    captured = {}
+
+    class CapturingAgent(_FakeAgent):
+        def invoke(self, inputs):
+            captured["messages"] = list(inputs["messages"])
+            return super().invoke(inputs)
+
+    node = make_specialist(
+        "recon",
+        ["recon"],
+        "be a recon agent",
+        ctx=_ctx(),
+        registry=reg,
+        llm=None,
+        agent_factory=CapturingAgent,
+    )
+    state = {
+        "target": "example.com",
+        "objective": "recon",
+        "authorized": True,
+        "messages": [HumanMessage("old 1"), AIMessage("old 2"), HumanMessage("old 3")],
+        "tool_results": [],
+    }
+    node(state)
+    assert len(captured["messages"]) == 1  # only the task, no prior transcript
+    assert "old" not in str(captured["messages"][0].content)

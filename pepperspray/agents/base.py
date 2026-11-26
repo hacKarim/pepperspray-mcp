@@ -95,8 +95,12 @@ def run_specialist_act(
         f"Objective: {state.get('objective', '')}\n"
         f"Authorized: {authorized}. Use your tools, then summarize findings."
     )
-    prior = list(state.get("messages", []))
-    result = agent.invoke({"messages": prior + [HumanMessage(task)]})
+    # Each specialist gets only its own task, not the accumulated multi-agent
+    # transcript: the supervisor's state carries the shared context (objective,
+    # findings, completed steps), so re-sending every prior message to every
+    # agent would cost O(n^2) tokens across a run and risk overflowing the
+    # model's context window on a long assessment.
+    result = agent.invoke({"messages": [HumanMessage(task)]})
     messages = result.get("messages", [])
 
     tool_results = _harvest_tool_results(messages)
