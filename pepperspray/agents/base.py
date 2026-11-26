@@ -100,7 +100,9 @@ def run_specialist_act(
     messages = result.get("messages", [])
 
     tool_results = _harvest_tool_results(messages)
-    findings = _findings_from_results(tool_results, agent=name, target=state.get("target", ""))
+    findings = _findings_from_results(
+        tool_results, agent=name, target=state.get("target", ""), authorized=authorized
+    )
     updates = {
         "messages": messages,
         "tool_results": tool_results,
@@ -136,7 +138,9 @@ def _infer_severity(text: str) -> str:
     return "info"
 
 
-def _findings_from_results(tool_results: list[dict], agent: str, target: str) -> list[dict]:
+def _findings_from_results(
+    tool_results: list[dict], agent: str, target: str, authorized: bool = False
+) -> list[dict]:
     """Summarize each tool run as a finding the critic and report can work on."""
     findings: list[dict] = []
     for tr in tool_results:
@@ -157,6 +161,9 @@ def _findings_from_results(tool_results: list[dict], agent: str, target: str) ->
                 # what, so the reflection verifier can re-run it to confirm.
                 "_tool": tool,
                 "_target": target,
+                # The run's authorization, so the reflection verifier re-runs a
+                # tool with exactly the authorization that produced this finding.
+                "_authorized": authorized,
             }
         )
     return findings

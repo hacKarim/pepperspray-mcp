@@ -63,3 +63,58 @@ def test_verify_marks_and_decrements():
     assert out["verify_budget"] == 0
     cur = {f["title"]: f for f in out["curated_findings"]}
     assert cur["SQLi in /login"]["verified"] is True
+
+
+# --- make_rerun_verifier robustness / authorization ------------------------
+
+
+class _FakeSpec:
+    def __init__(self, exploitation=False):
+        self.exploitation = exploitation
+
+
+class _RecordingRegistry:
+    """Minimal registry stand-in that records execute() authorization."""
+
+    def __init__(self, known=True, exploitation=False):
+        self._known = known
+        self._exploitation = exploitation
+        self.calls = []
+
+    def get(self, name):
+        if not self._known:
+            raise KeyError(f"unknown tool: {name}")
+        return _FakeSpec(exploitation=self._exploitation)
+
+    def execute(self, name, params, ctx, authorized):
+        self.calls.append(authorized)
+
+        class _R:
+            status = "success"
+
+        return _R()
+
+
+def test_rerun_verifier_unknown_tool_does_not_crash():
+    from pepperspray.agents.critic import make_rerun_verifier
+
+    reg = _RecordingRegistry(known=False)
+    verify = make_rerun_verifier(reg)
+    # A finding whose originating tool is not (or no longer) registered must be
+    # reported unconfirmed, not raise KeyError and kill the verify node.
+    assert verify({"_tool": "ghost_tool", "_target": "example.com"}, object()) is False
+
+
+def test_rerun_verifier_respects_finding_authorization():
+    from pepperspray.agents.critic import make_rerun_verifier
+
+    reg = _RecordingRegistry(known=True)
+    verify = make_rerun_verifier(reg)
+    # A finding produced by an UNAUTHORIZED run must never be re-executed as if
+    # it were authorized — that would run an active tool the operator refused.
+    verify({"_tool": "nmap_scan", "_target": "x", "_authorized": False}, object())
+    assert reg.calls == [False]
+    reg.calls.clear()
+    # An authorized finding re-runs with authorization (reproducible check).
+    verify({"_tool": "nmap_scan", "_target": "x", "_authorized": True}, object())
+    assert reg.calls == [True]

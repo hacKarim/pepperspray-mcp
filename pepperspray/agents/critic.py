@@ -130,7 +130,7 @@ def _default_verifier(finding: dict, ctx: Any) -> bool:
     return False
 
 
-def make_rerun_verifier(registry: Any, authorized: bool = True) -> Callable[[dict, Any], bool]:
+def make_rerun_verifier(registry: Any, authorized: bool = False) -> Callable[[dict, Any], bool]:
     """A real verifier: re-run the finding's originating tool and confirm it.
 
     Uses the ``_tool``/``_target`` metadata each finding carries. A finding is
@@ -145,13 +145,23 @@ def make_rerun_verifier(registry: Any, authorized: bool = True) -> Callable[[dic
         target = finding.get("_target")
         if not tool or not target or ctx is None:
             return False
-        spec = registry.get(tool)
+        try:
+            spec = registry.get(tool)
+        except KeyError:
+            # The originating tool is not (or no longer) registered: we cannot
+            # reproduce the finding, so leave it unconfirmed rather than crash.
+            return False
         if spec is None or getattr(spec, "exploitation", False):
             return False
+        # Re-run with the authorization of the run that produced the finding,
+        # never a broader one — a finding from an unauthorized run must not
+        # trigger an active-tool execution here. Fall back to the verifier's
+        # own default only when the finding predates this metadata.
+        run_authorized = bool(finding.get("_authorized", authorized))
         from pepperspray.core.registry import spread_target
 
         try:
-            result = registry.execute(tool, spread_target(target), ctx, authorized=authorized)
+            result = registry.execute(tool, spread_target(target), ctx, authorized=run_authorized)
         except Exception:
             return False
         return getattr(result, "status", "") == "success"

@@ -123,3 +123,15 @@ def test_specialist_emits_findings_from_tool_runs():
     assert out["findings"], "specialist should emit a finding per tool run"
     f = out["findings"][0]
     assert f["source"] == "recon" and "echo_tool" in f["title"]
+
+
+def test_findings_carry_run_authorization():
+    """Findings record the run's authorization so the reflection verifier never
+    re-runs an active tool more permissively than the run that produced it."""
+    from pepperspray.agents.base import _findings_from_results
+
+    tool_results = [{"tool": "nmap_scan", "result": {"status": "success", "stdout": "80/open"}}]
+    auth = _findings_from_results(tool_results, agent="recon", target="x", authorized=True)
+    assert auth[0]["_authorized"] is True
+    unauth = _findings_from_results(tool_results, agent="recon", target="x", authorized=False)
+    assert unauth[0]["_authorized"] is False
